@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "log.h": "c",
+        "uart_async_adapter.h": "c"
+    }
+}

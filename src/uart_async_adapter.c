@@ -7,7 +7,7 @@
 /** @file
  *  @brief UART asynchronous API adapter implementation
  */
-#include "uart_async_adapter.h"
+#include "../inc/uart_async_adapter.h"
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys/__assert.h>
 
