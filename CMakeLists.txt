@@ -11,7 +11,12 @@ project(homeflow_embedded_final)
 # NORDIC SDK APP START
 target_sources(app PRIVATE
   src/main.c
+  src/bme.c
   src/temp.c
+  src/r_enc.c
+  src/imu.c
+  src/rc_filter.c
+  src/hr.c
 )
 
 # Include UART ASYNC API adapter

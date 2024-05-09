@@ -20,6 +20,7 @@
 #include <zephyr/devicetree.h>
 
 const struct device* i2c0_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
+const struct device* gpio1_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
 
 int main(void)
 {
@@ -73,6 +74,14 @@ int main(void)
 		return 0;
 	}
 
+	//weather sensor init
+	BME688_Init();
+
+	//IMU init
+	init_IMU_cs();
+	init_IMU();
+	init_IMU_interrupts();
+	init_RCFilters();
 
 	while (1) {
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
@@ -83,8 +92,20 @@ int main(void)
 		char temp_buf[10];
 		snprintf(temp_buf, sizeof(temp_buf), "BTS:%f", temp);
 
+		// weather sensor
+		BME688_Take_Measurement();
+		char weather_buf[10];
+		int humidity = (int)BME688_Get_Temp_C();
+		snprintf(weather_buf, sizeof(weather_buf), "BMH:%d", humidity);
+
+		float x_xl = poll_IMU();
+		char x_xl_buf[10];
+		snprintf(x_xl_buf, sizeof(x_xl_buf), "BBV:%f", x_xl);
+
 		if (current_conn) {
 			bt_nus_send(current_conn, temp_buf, strlen(temp_buf));
+			bt_nus_send(current_conn, weather_buf, strlen(weather_buf));
+			bt_nus_send(current_conn, x_xl_buf, strlen(x_xl_buf));
 		}
 	}
 	
