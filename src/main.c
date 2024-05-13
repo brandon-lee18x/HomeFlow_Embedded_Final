@@ -1,4 +1,5 @@
 #include <zephyr/types.h>
+#include <zephyr/zephyr.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
@@ -7,13 +8,13 @@
 #include <zephyr/kernel.h>
 
 #include "bluetooth.c"
-#include "../inc/display.h"
 #include "../inc/spi.h"
 #include "../inc/r_enc.h"
 #include "../inc/bme.h"
 #include "../inc/temp.h"
 #include "../inc/hr.h"
 #include "../inc/imu.h"
+#include "../inc/display.h"
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
@@ -22,6 +23,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -48,6 +50,16 @@ static const struct adc_dt_spec adc_channels[] = {
 	DT_FOREACH_PROP_ELEM(DT_PATH(zephyr_user), io_channels,
 			     DT_SPEC_AND_COMMA)
 };
+
+#define IMU_STACK_SIZE 1024
+#define IMU_PRIORITY 8
+K_THREAD_STACK_DEFINE(imu_thread_stack, IMU_STACK_SIZE);
+struct k_thread imu_thread_data;
+
+#define DISPLAY_STACK_SIZE 1024
+#define DISPLAY_PRIORITY 8
+K_THREAD_STACK_DEFINE(display_thread_stack, DISPLAY_STACK_SIZE);
+struct k_thread display_thread_data;
 
 /*threads:
 display
@@ -84,52 +96,7 @@ int main(void)
 		}
 	}
 
-	configure_gpio();
-
-	err = uart_init();
-	if (err) {
-		// error();
-	}
-
-	if (IS_ENABLED(CONFIG_BT_NUS_SECURITY_ENABLED)) {
-		err = bt_conn_auth_cb_register(&conn_auth_callbacks);
-		if (err) {
-			printk("Failed to register authorization callbacks.\n");
-			return 0;
-		}
-
-		err = bt_conn_auth_info_cb_register(&conn_auth_info_callbacks);
-		if (err) {
-			printk("Failed to register authorization info callbacks.\n");
-			return 0;
-		}
-	}
-
-	err = bt_enable(NULL);
-	if (err) {
-		// error();
-	}
-
-	LOG_INF("Bluetooth initialized");
-
-	k_sem_give(&ble_init_ok);
-
-	if (IS_ENABLED(CONFIG_SETTINGS)) {
-		settings_load();
-	}
-
-	err = bt_nus_init(&nus_cb);
-	if (err) {
-		LOG_ERR("Failed to initialize UART service (err: %d)", err);
-		return 0;
-	}
-
-	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad), sd,
-			      ARRAY_SIZE(sd));
-	if (err) {
-		LOG_ERR("Advertising failed to start (err %d)", err);
-		return 0;
-	}
+	initialize_ble();
 
 	//weather sensor init
 	BME688_Init();
@@ -145,6 +112,14 @@ int main(void)
 
 	char adc_buf[30];
 	int adc_mv = 0;
+
+	k_thread_create(&imu_thread_data, imu_thread_stack, K_THREAD_STACK_SIZEOF(imu_thread_stack),
+					imu_thread_entry, NULL, NULL, NULL, IMU_PRIORITY, 0, K_NO_WAIT);
+	k_thread_create(&display_thread_data, display_thread_stack, K_THREAD_STACK_SIZEOF(display_thread_stack),
+					display_thread_entry, NULL, NULL, NULL, IMU_PRIORITY, 0, K_NO_WAIT);
+
+	k_thread_start(&imu_thread_data);
+	k_thread_start(&display_thread_data);
 
 	while (1) {
 		// Read ADC Values
@@ -213,9 +188,8 @@ int main(void)
 		float pressure = (float)BME688_Get_Pressure();
 		snprintf(pressure_buf, sizeof(pressure_buf), "BMP:%f", pressure);
 
-		float x_xl = poll_IMU();
-		char x_xl_buf[10];
-		snprintf(x_xl_buf, sizeof(x_xl_buf), "BBV:%f", x_xl);
+		char step_buf[10];
+		snprintf(step_buf, sizeof(step_buf), "BBV:%d", steps);
 
 		float* hr_data = read_hr();
 		float hr = hr_data[0];
@@ -233,17 +207,21 @@ int main(void)
 		
 		snprintf(adc_buf, sizeof(adc_buf), "MIC:%d", adc_mv);
 
+		char display_buf[10];
+		snprintf(display_buf, sizeof(display_buf), "YBV:%d", display_var);
+
 		if (current_conn) {
 			bt_nus_send(current_conn, temp_buf, strlen(temp_buf));
 			bt_nus_send(current_conn, humidity_buf, strlen(humidity_buf));
 			bt_nus_send(current_conn, temp_c_buf, strlen(temp_c_buf));
 			bt_nus_send(current_conn, gas_buf, strlen(gas_buf));
 			bt_nus_send(current_conn, pressure_buf, strlen(pressure_buf));
-			bt_nus_send(current_conn, x_xl_buf, strlen(x_xl_buf));
+			bt_nus_send(current_conn, step_buf, strlen(step_buf));
 			bt_nus_send(current_conn, adc_buf, strlen(adc_buf));
 			bt_nus_send(current_conn, hr_buf, strlen(hr_buf));
 			bt_nus_send(current_conn, spo2_buf, strlen(spo2_buf));
 			bt_nus_send(current_conn, hr_confidence_buf, strlen(hr_confidence_buf));
+			bt_nus_send(current_conn, display_buf, strlen(display_buf));
 		}
 	}
 	

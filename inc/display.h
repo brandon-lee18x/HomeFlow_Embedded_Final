@@ -5,6 +5,8 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
 
+extern int display_var;
+
 // Function to initialize the display
 void main_display_init(const struct device *spi1_dev, const struct device *gpio0_dev, uint16_t color);
 
@@ -43,5 +45,7 @@ void st7789v_fill_rect(const struct device *spi_dev, const struct device *gpio_d
 
 // Optimized function to fill a rectangle with a single color
 void st7789v_fill_rect_optimized(const struct device *spi_dev, const struct device *gpio_dev, uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t color);
+
+void display_thread_entry(void *p1, void *p2, void *p3);
 
 #endif // DISPLAY_H

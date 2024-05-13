@@ -16,6 +16,9 @@ SDA/MOSI (gray): P113
 SDOAG/MISO (orange): P114
 */
 
+#ifndef IMU_H
+#define IMU_H
+
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
@@ -24,6 +27,7 @@ SDOAG/MISO (orange): P114
 #include <string.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
+#include <zephyr/logging/log.h>
 #include "rc_filter.h"
 
 //relevant registers masks used for IMU
@@ -89,6 +93,7 @@ extern float cutoff_freqs[NUM_AXES];
 extern volatile float IMU_readings[NUM_AXES]; //sensor readings in g's and dps
 extern volatile int interrupt_called;
 extern volatile int max_x;
+extern int steps;
 
 void spi_read_reg(uint8_t reg, uint8_t values[], uint8_t size);
 void spi_write_reg(uint8_t reg, uint8_t data, uint8_t size);
@@ -98,3 +103,6 @@ void IMU_interrupt_cb(const struct device *dev, struct gpio_callback *cb, uint32
 void init_IMU_cs();
 float poll_IMU();
 void init_RCFilters();
+void imu_thread_entry(void *p1, void *p2, void *p3);
+
+#endif

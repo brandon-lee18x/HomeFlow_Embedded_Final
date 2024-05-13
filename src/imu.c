@@ -281,6 +281,11 @@ void print_filtered_readings() {
 			filtered_buf[G_X_IND], filtered_buf[G_Y_IND], filtered_buf[G_Z_IND]);
 }
 
-void print_readings_csv() {
+int steps;
 
+void imu_thread_entry(void *p1, void *p2, void *p3) {
+	while(1) {
+		steps++;
+		k_msleep(1);
+	}
 }

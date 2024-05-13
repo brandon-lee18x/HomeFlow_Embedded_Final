@@ -17,6 +17,7 @@ target_sources(app PRIVATE
   src/imu.c
   src/rc_filter.c
   src/hr.c
+  src/display.c
 )
 
 # Include UART ASYNC API adapter
