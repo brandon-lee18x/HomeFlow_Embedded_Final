@@ -14,6 +14,6 @@ extern const struct device* gpio0_dev;
 extern const struct device* i2c0_dev;
 
 void init_hr();
-float read_hr();
-float read_blood_ox();
+float* read_hr();
+
 #endif
