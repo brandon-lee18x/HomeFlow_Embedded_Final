@@ -96,5 +96,5 @@ void init_IMU();
 void init_IMU_interrupts();
 void IMU_interrupt_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 void init_IMU_cs();
-void poll_IMU();
+float poll_IMU();
 void init_RCFilters();

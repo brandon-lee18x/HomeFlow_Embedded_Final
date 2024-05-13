@@ -187,7 +187,7 @@ void init_IMU_cs() {
 }
 
 int i = 1;
-void poll_IMU() {
+float poll_IMU() {
     if (interrupt_called) {
 			print_unfiltered_readings();
 			printk("max xl_x: %d\n", max_x);
@@ -241,6 +241,7 @@ void poll_IMU() {
 
 	// print_unfiltered_readings();
 	print_filtered_readings();
+	return IMU_readings[XL_X_IND];
 }
 
 //helper function to be called in main

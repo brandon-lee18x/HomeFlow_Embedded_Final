@@ -4,25 +4,31 @@ uint8_t HR_ADDR = 0x55;
 
 void init_hr() {
     int ret;
-    uint8_t data_buffer[2]; // Assuming 2 bytes data from the sensor; adjust as needed
+    uint8_t data_buffer[2];
+	
     // Configure pins 11 and 12 as outputs for use with heart rate monitor
 	// P0.11 = MFIO and P0.12 = RST
-    gpio_pin_configure(gpio0_dev, MFIO, GPIO_OUTPUT_ACTIVE);
+    gpio_pin_configure(gpio0_dev, MFIO, GPIO_OUTPUT_ACTIVE | GPIO_ACTIVE_HIGH);
 	gpio_pin_set(gpio0_dev, MFIO, 0);
-    gpio_pin_configure(gpio0_dev, RST, GPIO_OUTPUT_ACTIVE); 
-	gpio_pin_set(gpio0_dev, RST, 0);
-    
-	gpio_pin_set(gpio0_dev, MFIO, 1);
-	gpio_pin_set(gpio0_dev, RST, 0);
-	k_msleep(250);
+    gpio_pin_configure(gpio0_dev, RST, GPIO_OUTPUT_ACTIVE | GPIO_ACTIVE_HIGH); 
+	gpio_pin_set(gpio0_dev, RST, 1);
 
-	gpio_pin_set(gpio0_dev, MFIO, 0);
+	k_msleep(1000);
+
+	gpio_pin_set(gpio0_dev, RST, 0);
+	k_msleep(5);
+	gpio_pin_set(gpio0_dev, MFIO, 1);
 	k_msleep(5);
 	gpio_pin_set(gpio0_dev, RST, 1);
-	k_msleep(5);
-	gpio_pin_set(gpio0_dev, MFIO, 1);
 	k_msleep(750);
 
+	// uint8_t write_mode[3] = {0x01, 0x00, 0x00};
+	// ret = i2c_write(i2c0_dev, write_mode, 3, HR_ADDR);
+	// if (ret < 0) {
+	// 	printk("error writing to hr sensor");
+	// 	return 0; // Error writing to sensor
+	// }
+	
 	uint8_t read_mode[2] = {0x02, 0x00};
 	ret = i2c_write(i2c0_dev, read_mode, 2, HR_ADDR);
 		if (ret < 0) {
@@ -146,7 +152,7 @@ void init_hr() {
 			printk("error writing to hr sensor");
 			return 0; // Error writing to sensor
 		}
-	BME688_Init();
+		
 	uint8_t sensor_status[2];
 	ret = i2c_read(i2c0_dev, sensor_status, sizeof(sensor_status), HR_ADDR);
 		if (ret < 0) {
@@ -157,7 +163,7 @@ void init_hr() {
 	printf("Sensor Status:  %u\n\n", sensor_status[0], sensor_status[1]);
 }
 
-float read_hr() {
+float* read_hr() {
     uint8_t get_fifo[2] = {0x12, 0x01};
     int ret = i2c_write(i2c0_dev, get_fifo, sizeof(get_fifo), HR_ADDR);
     if (ret < 0) {
@@ -172,25 +178,9 @@ float read_hr() {
         return 0; // Error reading from sensor
     }
 
-    float heart_rate = (fifo[13]<<8|fifo[14])/10.0;
-    return heart_rate;
-}
-
-float read_blood_ox() {
-    uint8_t get_fifo[2] = {0x12, 0x01};
-    int ret = i2c_write(i2c0_dev, get_fifo, sizeof(get_fifo), HR_ADDR);
-    if (ret < 0) {
-		printk("error writing to hr sensor");
-        return 0; // Error writing to sensor
-    }
-		
-    uint8_t fifo[19];
-    ret = i2c_read(i2c0_dev, fifo, sizeof(fifo), HR_ADDR);
-    if (ret < 0) {
-		printk("error reading from hr sensor");
-        return 0; // Error reading from sensor
-    }
-
-    float SpO2 = (fifo[16]<<8|fifo[17])/10.0;
-    return SpO2;
+	static float arr[3];
+    arr[0] = (fifo[13]<<8|fifo[14])/10.0; // Heart rate (BPM)
+	arr[1] = fifo[15]; // Heart rate confidence  (%)
+	arr[2] = (fifo[16]<<8|fifo[17])/10.0; // Blood oxygen saturation (%)
+    return arr;
 }
