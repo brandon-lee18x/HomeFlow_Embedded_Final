@@ -7,6 +7,8 @@
         "temp.h": "c",
         "bme.h": "c",
         "imu.h": "c",
-        "adc.h": "c"
+        "adc.h": "c",
+        "string.h": "c",
+        "printk.h": "c"
     }
 }

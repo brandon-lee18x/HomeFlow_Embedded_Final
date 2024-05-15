@@ -28,6 +28,8 @@ SDOAG/MISO (orange): P114
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
+#include <math.h>
+
 #include "rc_filter.h"
 
 //relevant registers masks used for IMU
@@ -80,6 +82,21 @@ SDOAG/MISO (orange): P114
 #define G_Y_IND 4
 #define G_Z_IND 5
 
+#define SAMPLING_INTERVAL_MS 10  // Sampling rate = 1 / SAMPLING_INTERVAL_S
+#define ALPHA 0.1
+
+#define A0 0.020083365564211235
+#define A1 0.04016673112842247
+#define A2 0.020083365564211235
+#define B1 -1.5610180758007182
+#define B2 0.6413515380575631
+
+// Butterworth filter state
+typedef struct {
+    float x[2];  // Input samples
+    float y[2];  // Output samples
+} ButterworthFilter;
+
 extern const struct device *spi3_dev;
 extern struct spi_config spi3_cfg;
 extern const struct device* gpio0_dev;
@@ -94,6 +111,8 @@ extern volatile float IMU_readings[NUM_AXES]; //sensor readings in g's and dps
 extern volatile int interrupt_called;
 extern volatile int max_x;
 extern int steps;
+extern volatile float filtered_imu_data[3];
+extern volatile float threshold;
 
 void spi_read_reg(uint8_t reg, uint8_t values[], uint8_t size);
 void spi_write_reg(uint8_t reg, uint8_t data, uint8_t size);
@@ -101,8 +120,13 @@ void init_IMU();
 void init_IMU_interrupts();
 void IMU_interrupt_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 void init_IMU_cs();
-float poll_IMU();
+void poll_IMU();
 void init_RCFilters();
 void imu_thread_entry(void *p1, void *p2, void *p3);
+float calc_magnitude(float x, float y, float z);
+float ema_filter(float new_mag, float old_mag);
+void init_butterworth_filter(ButterworthFilter* filter);
+float butterworth_filter(ButterworthFilter* filter, float input);
+void detect_step(float magnitude);
 
 #endif

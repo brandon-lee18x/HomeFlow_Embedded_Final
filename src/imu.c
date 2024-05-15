@@ -3,7 +3,7 @@
 const struct device *spi3_dev = DEVICE_DT_GET(SPI3_NODE);
 struct spi_config spi3_cfg = {
 	.operation = SPI_WORD_SET(8),
-	.frequency = 4000000, // 4 MHz, but this depends on your device and board capabilities
+	.frequency = 10000000, // 10 MHz, but this depends on your device and board capabilities
 	.slave = 0, // Typically, your SPI slave's chip select pin
 };
 // const struct device *gpio1_dev = DEVICE_DT_GET(MY_GPI01); //cs P107
@@ -16,6 +16,13 @@ float cutoff_freqs[NUM_AXES] = {5.0f, 5.0f, 5.0f, 5.0f, 5.0f, 5.0f};
 volatile float IMU_readings[NUM_AXES]; //sensor readings in g's and dps
 volatile int interrupt_called = 0;
 volatile int max_x = 0;
+volatile float filtered_imu_data[3];
+float prev_magnitude = 1;
+int steps = 0;
+
+LOG_MODULE_REGISTER(imu);
+
+ButterworthFilter filter;
 
 void spi_read_reg(uint8_t reg, uint8_t values[], uint8_t size) {
     int err;
@@ -186,8 +193,7 @@ void init_IMU_cs() {
     gpio_pin_configure(gpio1_dev, GPIO_1_CS, GPIO_OUTPUT | GPIO_OUTPUT_INIT_HIGH);
 }
 
-int i = 1;
-float poll_IMU() {
+void poll_IMU() {
     if (interrupt_called) {
 			print_unfiltered_readings();
 			printk("max xl_x: %d\n", max_x);
@@ -239,16 +245,30 @@ float poll_IMU() {
 	IMU_readings[G_Y_IND] = ((rx_buf_g_y_upper[0] << 8 | rx_buf_g_y_lower[0]) - 40.722) * (8.75 / 1000);
 	IMU_readings[G_Z_IND] = ((rx_buf_g_z_upper[0] << 8 | rx_buf_g_z_lower[0]) - (-209.072)) * (8.75 / 1000);
 
-	// print_unfiltered_readings();
-	print_filtered_readings();
-	return IMU_readings[XL_X_IND];
+	// float mag = ema_filter(calc_magnitude(IMU_readings[0], IMU_readings[1], IMU_readings[2]), prev_magnitude);
+
+	//Filter raw IMU readings using sw RC Filter
+	float filtered_readings[NUM_AXES];
+	for (int i = 0; i < NUM_AXES; i++) {
+		//order: xl_x, xl_y, xl_z, g_x, g_y, g_z
+		filtered_readings[i] = RCFilter_Update(&lp_filters[i], IMU_readings[i]);
+	}
+	float mag = calc_magnitude(filtered_readings[XL_X_IND], filtered_readings[XL_Y_IND], filtered_readings[XL_Z_IND]);
+	//LOG_INF("X: %d.%d", (int)filtered_readings[XL_X_IND], (int)((filtered_readings[XL_X_IND] - (int)filtered_readings[XL_X_IND])*1000));
+	//LOG_INF("Y: %d.%d", (int)filtered_readings[XL_Y_IND], (int)((filtered_readings[XL_Y_IND] - (int)filtered_readings[XL_Y_IND])*1000));
+	//LOG_INF("Z: %d.%d", (int)filtered_readings[XL_Z_IND], (int)((filtered_readings[XL_Z_IND] - (int)filtered_readings[XL_Z_IND])*1000));
+	prev_magnitude = mag;
+	//LOG_INF("Magnitude: %d.%d", (int)mag, (int)((mag - (int)mag)*1000));
+	detect_step(mag);
 }
 
 //helper function to be called in main
 void init_RCFilters() {
 	for (int i = 0; i < NUM_AXES; i++) {
-		RCFilter_Init(&lp_filters[i], cutoff_freqs[i], 0.00105042016f);
+		RCFilter_Init(&lp_filters[i], cutoff_freqs[i], 0.01f);
 	}
+
+	init_butterworth_filter(&filter);
 }
 
 void print_unfiltered_readings() {
@@ -281,11 +301,56 @@ void print_filtered_readings() {
 			filtered_buf[G_X_IND], filtered_buf[G_Y_IND], filtered_buf[G_Z_IND]);
 }
 
-int steps;
-
 void imu_thread_entry(void *p1, void *p2, void *p3) {
-	while(1) {
-		steps++;
-		k_msleep(1);
+	while (1) {
+		poll_IMU();
+		k_msleep(SAMPLING_INTERVAL_MS);
 	}
+}
+
+float calc_magnitude(float x, float y, float z) {
+	return (float)sqrt(x * x + y * y + z * z);
+}
+
+float ema_filter(float new_mag, float old_mag) {
+	return ALPHA * new_mag + (1 - ALPHA) * old_mag;
+}
+
+void init_butterworth_filter(ButterworthFilter* filter) {
+    filter->x[0] = filter->x[1] = 0.0;
+    filter->y[0] = filter->y[1] = 0.0;
+}
+
+float butterworth_filter(ButterworthFilter* filter, float input) {
+    // Apply the Butterworth filter formula
+    float output = A0 * input + A1 * filter->x[0] + A2 * filter->x[1]
+                   - B1 * filter->y[0] - B2 * filter->y[1];
+
+    // Update filter state
+    filter->x[1] = filter->x[0];
+    filter->x[0] = input;
+    filter->y[1] = filter->y[0];
+    filter->y[0] = output;
+
+    return output;
+}
+
+#define BUFFER_SIZE 100
+#define MIN_TIME_BETWEEN_STEPS_MS 300  // Minimum time in milliseconds between steps
+#define MAX_TIME_BETWEEN_STEPS_MS 1500 // Maximum time in milliseconds between steps
+#define RECENT_STEP_COUNT 5  // Number of recent steps to keep track of for interval averaging
+#define INITIAL_THRESHOLD 2
+
+volatile float threshold = 1.2;
+
+// Function to detect steps
+void detect_step(float magnitude) {
+    if (magnitude > threshold) {
+		steps++;
+	}
+
+	threshold = ALPHA * (magnitude * 1.4) + (1 - ALPHA) * threshold;
+
+	//LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
+	LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude) * 1000));
 }
