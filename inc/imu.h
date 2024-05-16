@@ -29,8 +29,10 @@ SDOAG/MISO (orange): P114
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 #include <math.h>
+#include <zephyr/sys/ring_buffer.h>
 
 #include "rc_filter.h"
+#include "ring_buf.h"
 
 //relevant registers masks used for IMU
 #define CHIPID_REG_READ 0b10001111

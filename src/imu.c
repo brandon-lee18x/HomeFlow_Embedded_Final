@@ -6,12 +6,10 @@ struct spi_config spi3_cfg = {
 	.frequency = 10000000, // 10 MHz, but this depends on your device and board capabilities
 	.slave = 0, // Typically, your SPI slave's chip select pin
 };
-// const struct device *gpio1_dev = DEVICE_DT_GET(MY_GPI01); //cs P107
-// struct gpio_callback gpio_cb;
 
 //order: xl_x, xl_y, xl_z, g_x, g_y, g_z
 RCFilter lp_filters[NUM_AXES]; 
-float cutoff_freqs[NUM_AXES] = {5.0f, 5.0f, 5.0f, 5.0f, 5.0f, 5.0f};
+float cutoff_freqs[NUM_AXES] = {6.0f, 6.0f, 6.0f, 6.0f, 6.0f, 6.0f};
 
 volatile float IMU_readings[NUM_AXES]; //sensor readings in g's and dps
 volatile int interrupt_called = 0;
@@ -220,9 +218,6 @@ void poll_IMU() {
 	IMU_readings[XL_X_IND] = ((rx_buf_xl_x_upper[0] << 8 | rx_buf_xl_x_lower[0]) * 0.061) / 1000;
 	IMU_readings[XL_Y_IND] = ((rx_buf_xl_y_upper[0] << 8 | rx_buf_xl_y_lower[0]) * 0.061) / 1000;
 	IMU_readings[XL_Z_IND] = ((rx_buf_xl_z_upper[0] << 8 | rx_buf_xl_z_lower[0]) * 0.061) / 1000;
-	// xl_x = ((rx_buf_xl_x_upper[0] << 8 | rx_buf_xl_x_lower[0]) * 0.061) / 1000;
-	// xl_y = ((rx_buf_xl_y_upper[0] << 8 | rx_buf_xl_y_lower[0]) * 0.061) / 1000;
-	// xl_z = ((rx_buf_xl_z_upper[0] << 8 | rx_buf_xl_z_lower[0]) * 0.061) / 1000;
 
 	//Gyroscope
 	int8_t rx_buf_g_x_lower[1];
@@ -247,18 +242,21 @@ void poll_IMU() {
 
 	// float mag = ema_filter(calc_magnitude(IMU_readings[0], IMU_readings[1], IMU_readings[2]), prev_magnitude);
 
-	//Filter raw IMU readings using sw RC Filter
+	//Filter raw IMU readings using SW RC Filter
 	float filtered_readings[NUM_AXES];
 	for (int i = 0; i < NUM_AXES; i++) {
 		//order: xl_x, xl_y, xl_z, g_x, g_y, g_z
 		filtered_readings[i] = RCFilter_Update(&lp_filters[i], IMU_readings[i]);
 	}
+
+	char xl_x_filtered_buf[10], xl_y_filtered_buf[10], xl_z_filtered_buf[10];
+	snprintf(xl_x_filtered_buf, sizeof(xl_x_filtered_buf), "%f", filtered_readings[XL_X_IND]);
+	snprintf(xl_y_filtered_buf, sizeof(xl_y_filtered_buf), "%f", filtered_readings[XL_Y_IND]);
+	snprintf(xl_z_filtered_buf, sizeof(xl_z_filtered_buf), "%f", filtered_readings[XL_Z_IND]);
+	// LOG_INF("xl_x: %s     xl_y: %s     xl_z: %s", xl_x_filtered_buf, xl_y_filtered_buf, xl_z_filtered_buf);
+
 	float mag = calc_magnitude(filtered_readings[XL_X_IND], filtered_readings[XL_Y_IND], filtered_readings[XL_Z_IND]);
-	//LOG_INF("X: %d.%d", (int)filtered_readings[XL_X_IND], (int)((filtered_readings[XL_X_IND] - (int)filtered_readings[XL_X_IND])*1000));
-	//LOG_INF("Y: %d.%d", (int)filtered_readings[XL_Y_IND], (int)((filtered_readings[XL_Y_IND] - (int)filtered_readings[XL_Y_IND])*1000));
-	//LOG_INF("Z: %d.%d", (int)filtered_readings[XL_Z_IND], (int)((filtered_readings[XL_Z_IND] - (int)filtered_readings[XL_Z_IND])*1000));
 	prev_magnitude = mag;
-	//LOG_INF("Magnitude: %d.%d", (int)mag, (int)((mag - (int)mag)*1000));
 	detect_step(mag);
 }
 
@@ -341,16 +339,32 @@ float butterworth_filter(ButterworthFilter* filter, float input) {
 #define RECENT_STEP_COUNT 5  // Number of recent steps to keep track of for interval averaging
 #define INITIAL_THRESHOLD 2
 
-volatile float threshold = 1.2;
+volatile float step_threshold = 0.9;
+
+ring_buf samps;
+ring_buf intervals;
+long last_step_time_ms = 0;
+const float time_window_ms = 250;
 
 // Function to detect steps
 void detect_step(float magnitude) {
-    if (magnitude > threshold) {
+	// LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude)*1000));
+
+	//insert reading into samps and calc avg
+	insert_val(magnitude, &samps);
+	float samp_avg = get_rolling_avg(&samps);
+
+	uint32_t step_period = k_uptime_get() - last_step_time_ms;
+
+    if (samp_avg > step_threshold && step_period > time_window_ms) {
+		insert_val(step_period, &intervals);
+		float interval_avg = get_rolling_avg(&intervals);
+		if (step_period > 0.7 * interval_avg) {
+			last_step_time_ms = k_uptime_get();
+		}
 		steps++;
 	}
 
-	threshold = ALPHA * (magnitude * 1.4) + (1 - ALPHA) * threshold;
-
-	//LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
-	LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude) * 1000));
+	// LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
+	LOG_INF("Steps: %d", steps);
 }

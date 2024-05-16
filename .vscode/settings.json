@@ -9,6 +9,9 @@
         "imu.h": "c",
         "adc.h": "c",
         "string.h": "c",
-        "printk.h": "c"
+        "printk.h": "c",
+        "kernel.h": "c",
+        "toolchain.h": "c",
+        "ring_buf.h": "c"
     }
 }
