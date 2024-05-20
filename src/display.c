@@ -275,3 +275,11 @@ uint16_t main_display_update_test(const struct device *spi1_dev, const struct de
     st7789v_fill_rect_optimized(spi1_dev, gpio0_dev, 0, 0, DISPLAY_WIDTH_D, DISPLAY_HEIGHT_D, color); // Fills entire display with blue color
     return color += 0x1111;
 }
+
+int display_var = 0;
+void display_thread_entry(void *p1, void *p2, void *p3) {
+    while (1) {
+        display_var += 4;
+        k_msleep(5000);
+    }
+}
