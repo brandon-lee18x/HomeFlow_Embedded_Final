@@ -366,5 +366,5 @@ void detect_step(float magnitude) {
 	}
 
 	// LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
-	LOG_INF("Steps: %d", steps);
+	// LOG_INF("Steps: %d", steps);
 }

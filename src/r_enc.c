@@ -1,6 +1,8 @@
 #include "../inc/r_enc.h"
 #define BUTTON_DEBOUNCE_MS 50
 
+LOG_MODULE_REGISTER(r_enc);
+
 // Global state for the decoder
 volatile uint8_t decoder_state = 1;
 
@@ -64,7 +66,7 @@ void set_decoder_state(const struct device *dev, uint8_t state) {
     gpio_pin_set(dev, PIN_A, (state & 0b100) >> 2);
     gpio_pin_set(dev, PIN_B, (state & 0b010) >> 1);
     gpio_pin_set(dev, PIN_C, state & 0b001);
-    // printk("Decoder state: %d\n", state);
+    LOG_INF("Decoder state: %d\n", state);
 }
 
 // Encoder GPIO ISR

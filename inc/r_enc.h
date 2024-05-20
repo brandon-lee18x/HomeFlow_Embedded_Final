@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
 
 // Assign pins A, B, and BTN to P104, P105, & P106 respectively
 #define P0_03 3

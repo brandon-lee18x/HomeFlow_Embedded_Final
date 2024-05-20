@@ -12,6 +12,8 @@
         "printk.h": "c",
         "kernel.h": "c",
         "toolchain.h": "c",
-        "ring_buf.h": "c"
+        "ring_buf.h": "c",
+        "device.h": "c",
+        "devicetree.h": "c"
     }
 }

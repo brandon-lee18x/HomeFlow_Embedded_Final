@@ -36,6 +36,7 @@
 const struct device* i2c0_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
 const struct device* gpio1_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
 const struct device* gpio0_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+const struct device* spi1_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
 
 #define IMU_STACK_SIZE 1024
 #define IMU_PRIORITY 8
@@ -67,10 +68,11 @@ Remaining TODO's
 - firebase
 */
 
+
 int main(void)
 {
 	//ble init
-	initialize_ble();
+	// initialize_ble();
 
 	//weather sensor init
 	BME688_Init();
@@ -81,8 +83,15 @@ int main(void)
 	init_IMU_interrupts();
 	init_RCFilters();
 
+	//r_enc init
+	init_enc();
+
 	// Heart rate sensor initialization
 	init_hr();
+
+	//display init
+	//main_display_init(spi1_dev, gpio0_dev, backgroundColor, heartColor);
+	
 
 	k_thread_create(&imu_thread_data, imu_thread_stack, K_THREAD_STACK_SIZEOF(imu_thread_stack),
 					imu_thread_entry, NULL, NULL, NULL, IMU_PRIORITY, 0, K_NO_WAIT);
