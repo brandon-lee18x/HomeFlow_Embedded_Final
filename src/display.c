@@ -19,6 +19,8 @@
 #include <sys/time.h>
 #include <stdio.h>
 
+LOG_MODULE_REGISTER(display);
+
 #define SLEEP_TIME_MS_D   100
 
 // Update these definitions according to your pin connections
@@ -1210,12 +1212,124 @@ void display_fall_detected_alert(const struct device *spi_dev, const struct devi
 uint16_t backgroundColor = 0x0000;
 uint16_t textColor = 0xFFFF; 
 uint16_t heartColor = 0xFE60;
-int display_var = 0;
+// Define states for the state machine
+typedef enum {
+    HEART_RATE_SCREEN,
+    BLOOD_OXYGEN_SCREEN,
+    BODY_TEMP_SCREEN,
+    ACTIVITY_SCREEN,
+    WEATHER_SCREEN,
+    WARNING_SCREEN,
+    NUM_SCREENS // This should always be the last element
+} DisplayState;
+
 void display_thread_entry(void *p1, void *p2, void *p3) {
-    
+    DisplayState current_state = HEART_RATE_SCREEN;
+    bool setup_done = false;
+    int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance, distance_decimal, temp, humidity, aqi, pressure, pressure_decimal;
+    //bool cw_detected = false;
+    //bool ccw_detected = false;
+
+    // Seed the random number generator
+    srand(time(NULL));
+
     main_display_init(spi1_dev, gpio0_dev, backgroundColor, heartColor);
+
     while (1) {
-        display_var += 4;
-        k_msleep(5000);
+        // Check if setup is needed for the current state
+        if (!setup_done) {
+            switch (current_state) {
+                case HEART_RATE_SCREEN:
+                    setup_heartrate_screen(spi1_dev, gpio0_dev);
+                    break;
+                case BODY_TEMP_SCREEN:
+                    setup_bodytemp_screen(spi1_dev, gpio0_dev);
+                    break;
+                case ACTIVITY_SCREEN:
+                    setup_activity_screen(spi1_dev, gpio0_dev);
+                    break;
+                case WEATHER_SCREEN:
+                    setup_weather_screen(spi1_dev, gpio0_dev);
+                    break;
+                case WARNING_SCREEN:
+                    setup_warning_screen(spi1_dev, gpio0_dev, "fall_detected"); // Example alert
+                    break;
+                default:
+                    break;
+            }
+            setup_done = true;
+        }
+
+        // Update screen every second with random values
+        switch (current_state) {
+            case HEART_RATE_SCREEN:
+                heart_rate = rand() % 40 + 60; // Random heart rate between 60 and 100
+                update_heart_rate(spi1_dev, gpio0_dev, heart_rate);
+                blood_oxygen = rand() % 10 + 90; // Random blood oxygen between 90 and 100
+                update_blood_oxygen(spi1_dev, gpio0_dev, blood_oxygen);
+                break;
+
+
+            case BODY_TEMP_SCREEN:
+                body_temp = rand() % 4 + 96; // Random body temp between 96 and 100
+                body_temp_decimal = rand() % 10; // Random decimal part
+                update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
+                break;
+
+            case ACTIVITY_SCREEN:
+                total_steps = rand() % 10000; // Random steps between 0 and 9999
+                update_total_steps(spi1_dev, gpio0_dev, total_steps);
+                distance = rand() % 10; // Random distance between 0 and 9
+                distance_decimal = rand() % 10; // Random decimal part
+                update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
+                break;
+
+            case WEATHER_SCREEN:
+                temp = rand() % 50 + 50; // Random temperature between 50 and 100
+                humidity = rand() % 101; // Random humidity between 0 and 100
+                aqi = rand() % 500; // Random AQI between 0 and 500
+                pressure = rand() % 40 + 950; // Random pressure between 950 and 990
+                pressure_decimal = rand() % 10; // Random decimal part
+                update_weather_data(spi1_dev, gpio0_dev, temp, humidity, aqi, pressure, pressure_decimal);
+                break;
+
+            case WARNING_SCREEN:
+                // Example alert, you can add more detailed alert handling here
+                setup_warning_screen(spi1_dev, gpio0_dev, "fall_detected");
+                break;
+
+            default:
+                break;
+        }
+
+        k_msleep(1000); // Wait for 1 second
+
+        // // Change state every 10 seconds
+        // static int elapsed_time = 0;
+        // elapsed_time += 1000;
+        // if (elapsed_time >= 10000) {
+        //     current_state = (current_state + 1) % NUM_SCREENS;
+        //     setup_done = false;
+        //     elapsed_time = 0;
+        // }
+
+        // Check for rotary encoder input
+        if (cw_detected || ccw_detected) {
+            if (current_state == WARNING_SCREEN) {
+                current_state = HEART_RATE_SCREEN;
+            } else {
+                if (cw_detected) {
+                    current_state = (current_state + 1) % (NUM_SCREENS - 1); // Skip the WARNING_SCREEN
+                } else if (ccw_detected) {
+                    current_state = (current_state == 0) ? NUM_SCREENS - 2 : current_state - 1; // Skip the WARNING_SCREEN
+                }
+            }
+            setup_done = false;
+            cw_detected = false;
+            ccw_detected = false;
+        }
+
+
+        
     }
 }

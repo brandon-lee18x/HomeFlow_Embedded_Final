@@ -4,10 +4,14 @@
 #include <zephyr/types.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/logging/log.h>
+#include <stdbool.h>
 
 extern int display_var;
 extern const struct device* spi1_dev;
 extern const struct device* gpio0_dev;
+extern volatile bool cw_detected;
+extern volatile bool ccw_detected;
 
 // Function to initialize the display
 void main_display_init(const struct device *spi1_dev, const struct device *gpio0_dev, uint16_t backgroundColor, uint16_t heartColor);

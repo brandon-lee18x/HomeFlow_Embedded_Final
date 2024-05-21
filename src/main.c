@@ -85,18 +85,16 @@ int main(void)
 
 	//r_enc init
 	init_enc();
+	LOG_INF("initialized encoder");
 
 	// Heart rate sensor initialization
 	init_hr();
-
-	//display init
-	//main_display_init(spi1_dev, gpio0_dev, backgroundColor, heartColor);
 	
 
 	k_thread_create(&imu_thread_data, imu_thread_stack, K_THREAD_STACK_SIZEOF(imu_thread_stack),
 					imu_thread_entry, NULL, NULL, NULL, IMU_PRIORITY, 0, K_NO_WAIT);
 	k_thread_create(&display_thread_data, display_thread_stack, K_THREAD_STACK_SIZEOF(display_thread_stack),
-					display_thread_entry, NULL, NULL, NULL, IMU_PRIORITY, 0, K_NO_WAIT);
+					display_thread_entry, NULL, NULL, NULL, DISPLAY_PRIORITY, 0, K_NO_WAIT);
 	
 
 	k_thread_start(&imu_thread_data);
@@ -108,24 +106,29 @@ int main(void)
 		float temp = get_body_temp();
 		char temp_buf[10];
 		snprintf(temp_buf, sizeof(temp_buf), "BTS:%f", temp);
+		LOG_INF("%s", temp_buf);
 
 		// Take BME688 measurement
 		BME688_Take_Measurement();
 		char humidity_buf[10];
 		float humidity = (float)BME688_Get_Humidity();
 		snprintf(humidity_buf, sizeof(humidity_buf), "BMH:%f", humidity);
+		LOG_INF("%s", humidity_buf);
 
 		char temp_c_buf[10];
 		float temp_c = (float)BME688_Get_Temp_C();
 		snprintf(temp_c_buf, sizeof(temp_c_buf), "BMT:%f", (temp_c*1.8)+32);
+		LOG_INF("%s", temp_c_buf);
 
 		char gas_buf[10];
 		float gas = (float)BME688_Get_Gas();
 		snprintf(gas_buf, sizeof(gas_buf), "BMG:%f", gas);
+		LOG_INF("%s", gas_buf);
 
 		char pressure_buf[10];
 		float pressure = (float)BME688_Get_Pressure();
 		snprintf(pressure_buf, sizeof(pressure_buf), "BMP:%f", pressure);
+		LOG_INF("%s", pressure_buf);
 
 		char step_buf[10];
 		snprintf(step_buf, sizeof(step_buf), "STP:%d", steps);
@@ -137,12 +140,15 @@ int main(void)
 
 		char hr_buf[10];
 		snprintf(hr_buf, sizeof(hr_buf), "BPM:%f", hr);
+		LOG_INF("%s", hr_buf);
 		
 		char spo2_buf[10];
 		snprintf(spo2_buf, sizeof(spo2_buf), "BOS:%f", bos);
+		LOG_INF("%s", spo2_buf);
 
 		char hr_confidence_buf[10];
 		snprintf(hr_confidence_buf, sizeof(hr_confidence_buf), "HRC:%d", hr_confidence);
+		LOG_INF("%s", hr_confidence_buf);
 
 		char xl_x_buf[10];
 		char xl_y_buf[10];
@@ -150,6 +156,9 @@ int main(void)
 		snprintf(xl_x_buf, sizeof(xl_x_buf), "XLX:%f", IMU_readings[0]);
 		snprintf(xl_y_buf, sizeof(xl_y_buf), "XLY:%f", IMU_readings[1]);
 		snprintf(xl_z_buf, sizeof(xl_z_buf), "XLZ:%f", IMU_readings[2]);
+		// LOG_INF("%s", xl_x_buf);
+		// LOG_INF("%s", xl_y_buf);
+		// LOG_INF("%s", xl_z_buf);
 
 		if (current_conn) {
 			bt_nus_send(current_conn, temp_buf, strlen(temp_buf));
