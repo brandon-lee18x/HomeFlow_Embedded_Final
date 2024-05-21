@@ -84,7 +84,7 @@ int main(void)
 	init_RCFilters();
 
 	//r_enc init
-	init_enc();
+	//init_enc();
 
 	// Heart rate sensor initialization
 	init_hr();
