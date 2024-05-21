@@ -30,6 +30,7 @@ SDOAG/MISO (orange): P114
 #include <zephyr/logging/log.h>
 #include <math.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <stdbool.h>
 
 #include "rc_filter.h"
 #include "ring_buf.h"
@@ -122,13 +123,13 @@ void init_IMU();
 void init_IMU_interrupts();
 void IMU_interrupt_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 void init_IMU_cs();
-void poll_IMU();
+float poll_IMU(); //returns magnitude as a pointer
 void init_RCFilters();
 void imu_thread_entry(void *p1, void *p2, void *p3);
 float calc_magnitude(float x, float y, float z);
 float ema_filter(float new_mag, float old_mag);
 void init_butterworth_filter(ButterworthFilter* filter);
 float butterworth_filter(ButterworthFilter* filter, float input);
-void detect_step(float magnitude);
+bool detect_step(float magnitude);
 
 #endif

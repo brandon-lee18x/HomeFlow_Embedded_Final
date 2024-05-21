@@ -57,8 +57,8 @@ void set_decoder_state(const struct device *dev, uint8_t state) {
 
 // Encoder GPIO ISR
 void encoder_isr(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
-    uint8_t pin_a_val = gpio_pin_get(dev, P0_03);
-    uint8_t pin_b_val = gpio_pin_get(dev, P0_04);
+    // uint8_t pin_a_val = gpio_pin_get(dev, P0_03);
+    // uint8_t pin_b_val = gpio_pin_get(dev, P0_04);
     // process_encoder_input(dev, pin_a_val, pin_b_val);
 
     uint8_t encoder_val = (gpio_pin_get(dev, P0_03) << 1) | gpio_pin_get(dev, P0_04); 
@@ -106,8 +106,6 @@ void debounce_twist(const struct device *dev, uint8_t enc_val) {
                     break;
                 case 0b11:
                     //do decoder logic to indicate clockwise turn
-                    // decoder_state = (decoder_state % 5) + 1;
-                    // set_decoder_state(dev, decoder_state);
                     cw_detected = true;
                     state = 0;
                     break;
@@ -140,8 +138,6 @@ void debounce_twist(const struct device *dev, uint8_t enc_val) {
                     break;
                 case 0b11:
                     //do decoder logic to indicate ccw turn
-                    // decoder_state = (decoder_state == 1) ? 5 : decoder_state - 1;
-                    // set_decoder_state(dev, decoder_state);
                     ccw_detected = true;
                     state = 0;
                     break;

@@ -13,9 +13,6 @@
 #include <zephyr/types.h>
 #include <stdlib.h>
 #include <time.h>
-
-
-
 #include <sys/time.h>
 #include <stdio.h>
 
@@ -1225,6 +1222,7 @@ typedef enum {
 
 void display_thread_entry(void *p1, void *p2, void *p3) {
     DisplayState current_state = HEART_RATE_SCREEN;
+    sensor_data* d = (sensor_data*)p1;
     bool setup_done = false;
     int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance, distance_decimal, temp, humidity, aqi, pressure, pressure_decimal;
     //bool cw_detected = false;
@@ -1234,6 +1232,7 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
     srand(time(NULL));
 
     main_display_init(spi1_dev, gpio0_dev, backgroundColor, heartColor);
+    setup_heartrate_screen(spi1_dev, gpio0_dev);
 
     while (1) {
         // Check if setup is needed for the current state
@@ -1263,19 +1262,14 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
         // Update screen every second with random values
         switch (current_state) {
             case HEART_RATE_SCREEN:
-                heart_rate = rand() % 40 + 60; // Random heart rate between 60 and 100
-                update_heart_rate(spi1_dev, gpio0_dev, heart_rate);
-                blood_oxygen = rand() % 10 + 90; // Random blood oxygen between 90 and 100
-                update_blood_oxygen(spi1_dev, gpio0_dev, blood_oxygen);
+                update_heart_rate(spi1_dev, gpio0_dev, (int)d->hr);
+                update_blood_oxygen(spi1_dev, gpio0_dev, (int)d->bos);
                 break;
-
-
             case BODY_TEMP_SCREEN:
-                body_temp = rand() % 4 + 96; // Random body temp between 96 and 100
-                body_temp_decimal = rand() % 10; // Random decimal part
+                body_temp = d->body_temp;
+                body_temp_decimal = (int)((d->body_temp - body_temp) * 100);
                 update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
                 break;
-
             case ACTIVITY_SCREEN:
                 total_steps = rand() % 10000; // Random steps between 0 and 9999
                 update_total_steps(spi1_dev, gpio0_dev, total_steps);
@@ -1283,16 +1277,14 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 distance_decimal = rand() % 10; // Random decimal part
                 update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
                 break;
-
             case WEATHER_SCREEN:
-                temp = rand() % 50 + 50; // Random temperature between 50 and 100
-                humidity = rand() % 101; // Random humidity between 0 and 100
-                aqi = rand() % 500; // Random AQI between 0 and 500
-                pressure = rand() % 40 + 950; // Random pressure between 950 and 990
-                pressure_decimal = rand() % 10; // Random decimal part
+                temp = (int)d->weather_temp;
+                humidity = d->humidity; // Random humidity between 0 and 100
+                aqi = (int)d->aqi; // Random AQI between 0 and 500
+                pressure = d->pressure; // Random pressure between 950 and 990
+                pressure_decimal = (int)((d->pressure - pressure) * 100); // Random decimal part
                 update_weather_data(spi1_dev, gpio0_dev, temp, humidity, aqi, pressure, pressure_decimal);
                 break;
-
             case WARNING_SCREEN:
                 // Example alert, you can add more detailed alert handling here
                 setup_warning_screen(spi1_dev, gpio0_dev, "fall_detected");
@@ -1302,7 +1294,7 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 break;
         }
 
-        k_msleep(1000); // Wait for 1 second
+        // k_msleep(1000); // Wait for 1 second
 
         // // Change state every 10 seconds
         // static int elapsed_time = 0;

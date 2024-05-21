@@ -191,11 +191,11 @@ void init_IMU_cs() {
     gpio_pin_configure(gpio1_dev, GPIO_1_CS, GPIO_OUTPUT | GPIO_OUTPUT_INIT_HIGH);
 }
 
-void poll_IMU() {
+float poll_IMU() {
     if (interrupt_called) {
-			print_unfiltered_readings();
-			printk("max xl_x: %d\n", max_x);
-			printk("interrupt fired\n");
+			// print_unfiltered_readings();
+			// printk("max xl_x: %d\n", max_x);
+			// printk("interrupt fired\n");
 			interrupt_called = 0;
 	}
 
@@ -250,14 +250,13 @@ void poll_IMU() {
 	}
 
 	char xl_x_filtered_buf[10], xl_y_filtered_buf[10], xl_z_filtered_buf[10];
-	snprintf(xl_x_filtered_buf, sizeof(xl_x_filtered_buf), "%f", filtered_readings[XL_X_IND]);
-	snprintf(xl_y_filtered_buf, sizeof(xl_y_filtered_buf), "%f", filtered_readings[XL_Y_IND]);
-	snprintf(xl_z_filtered_buf, sizeof(xl_z_filtered_buf), "%f", filtered_readings[XL_Z_IND]);
+	// snprintf(xl_x_filtered_buf, sizeof(xl_x_filtered_buf), "%f", filtered_readings[XL_X_IND]);
+	// snprintf(xl_y_filtered_buf, sizeof(xl_y_filtered_buf), "%f", filtered_readings[XL_Y_IND]);
+	// snprintf(xl_z_filtered_buf, sizeof(xl_z_filtered_buf), "%f", filtered_readings[XL_Z_IND]);
 	// LOG_INF("xl_x: %s     xl_y: %s     xl_z: %s", xl_x_filtered_buf, xl_y_filtered_buf, xl_z_filtered_buf);
 
 	float mag = calc_magnitude(filtered_readings[XL_X_IND], filtered_readings[XL_Y_IND], filtered_readings[XL_Z_IND]);
-	prev_magnitude = mag;
-	detect_step(mag);
+	return mag;
 }
 
 //helper function to be called in main
@@ -300,8 +299,11 @@ void print_filtered_readings() {
 }
 
 void imu_thread_entry(void *p1, void *p2, void *p3) {
+	int* steps = (int*)p1;
+	float magnitude = 0;
 	while (1) {
-		poll_IMU();
+		magnitude = poll_IMU();
+		detect_step(magnitude);
 		k_msleep(SAMPLING_INTERVAL_MS);
 	}
 }
@@ -347,7 +349,7 @@ long last_step_time_ms = 0;
 const float time_window_ms = 250;
 
 // Function to detect steps
-void detect_step(float magnitude) {
+bool detect_step(float magnitude) {
 	// LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude)*1000));
 
 	//insert reading into samps and calc avg
@@ -362,8 +364,9 @@ void detect_step(float magnitude) {
 		if (step_period > 0.7 * interval_avg) {
 			last_step_time_ms = k_uptime_get();
 		}
-		steps++;
+		return true;
 	}
+	return false;
 
 	// LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
 	// LOG_INF("Steps: %d", steps);
