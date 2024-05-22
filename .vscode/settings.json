@@ -14,6 +14,7 @@
         "toolchain.h": "c",
         "ring_buf.h": "c",
         "device.h": "c",
-        "devicetree.h": "c"
+        "devicetree.h": "c",
+        "stdbool.h": "c"
     }
 }

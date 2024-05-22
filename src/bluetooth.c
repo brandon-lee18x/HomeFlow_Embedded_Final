@@ -33,6 +33,8 @@
 
 #include <zephyr/logging/log.h>
 
+#include "../inc/bluetooth.h"
+
 #define LOG_MODULE_NAME peripheral_uart
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
@@ -635,7 +637,9 @@ void initialize_ble() {
 	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad), sd,
 			      ARRAY_SIZE(sd));
 	if (err) {
-		LOG_ERR("Advertising failed to start (err %d)", err);
 		return 0;
 	}
+
+	k_sleep(K_MSEC(3000));
+
 }

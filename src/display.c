@@ -13,11 +13,10 @@
 #include <zephyr/types.h>
 #include <stdlib.h>
 #include <time.h>
-
-
-
 #include <sys/time.h>
 #include <stdio.h>
+
+LOG_MODULE_REGISTER(display);
 
 #define SLEEP_TIME_MS_D   100
 
@@ -1210,6 +1209,7 @@ void display_fall_detected_alert(const struct device *spi_dev, const struct devi
 uint16_t backgroundColor = 0x0000;
 uint16_t textColor = 0xFFFF; 
 uint16_t heartColor = 0xFE60;
+
 // Define states for the state machine
 typedef enum {
     HEART_RATE_SCREEN,
@@ -1223,8 +1223,12 @@ typedef enum {
 
 void display_thread_entry(void *p1, void *p2, void *p3) {
     DisplayState current_state = HEART_RATE_SCREEN;
+    sensor_data* d = (sensor_data*)p1;
     bool setup_done = false;
-    int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance, distance_decimal, temp, humidity, aqi, pressure, pressure_decimal;
+    int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance = 0, distance_decimal = 0, temp, humidity, raw_gas, aqi, pressure, pressure_decimal;
+    int prev_total_steps = 0, prev_hr = 0, prev_blood_oxygen = 0;
+    //bool cw_detected = false;
+    //bool ccw_detected = false;
 
     // Seed the random number generator
     srand(time(NULL));
@@ -1236,9 +1240,6 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
         if (!setup_done) {
             switch (current_state) {
                 case HEART_RATE_SCREEN:
-                    setup_heartrate_screen(spi1_dev, gpio0_dev);
-                    break;
-                case BLOOD_OXYGEN_SCREEN:
                     setup_heartrate_screen(spi1_dev, gpio0_dev);
                     break;
                 case BODY_TEMP_SCREEN:
@@ -1262,39 +1263,78 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
         // Update screen every second with random values
         switch (current_state) {
             case HEART_RATE_SCREEN:
-                heart_rate = rand() % 40 + 60; // Random heart rate between 60 and 100
-                update_heart_rate(spi1_dev, gpio0_dev, heart_rate);
-                blood_oxygen = rand() % 10 + 90; // Random blood oxygen between 90 and 100
-                update_blood_oxygen(spi1_dev, gpio0_dev, blood_oxygen);
-                break;
+                heart_rate = d->hr;
+                blood_oxygen = d->bos;
 
-            case BLOOD_OXYGEN_SCREEN:
-                blood_oxygen = rand() % 10 + 90; // Random blood oxygen between 90 and 100
-                update_blood_oxygen(spi1_dev, gpio0_dev, blood_oxygen);
-                break;
+                if(heart_rate == 0){
+                    update_heart_rate(spi1_dev, gpio0_dev, prev_hr);
+                }
+                else{
+                    update_heart_rate(spi1_dev, gpio0_dev, heart_rate);
+                    prev_hr = heart_rate;
+                }
+                if(blood_oxygen == 0){
+                    update_blood_oxygen(spi1_dev, gpio0_dev, prev_blood_oxygen);
+                }
+                else{
+                    update_blood_oxygen(spi1_dev, gpio0_dev, blood_oxygen);
+                    prev_blood_oxygen = blood_oxygen;
+                }
+                
 
+                break;
             case BODY_TEMP_SCREEN:
-                body_temp = rand() % 4 + 96; // Random body temp between 96 and 100
-                body_temp_decimal = rand() % 10; // Random decimal part
+                body_temp = d->body_temp;
+                body_temp_decimal = (int)((d->body_temp - body_temp) * 10);
+                body_temp = body_temp + 17; //Calibrationg
                 update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
                 break;
-
             case ACTIVITY_SCREEN:
-                total_steps = rand() % 10000; // Random steps between 0 and 9999
+                total_steps = d->steps;
+                if ((total_steps % 200 == 0) && (total_steps != prev_total_steps)){
+                	distance_decimal++;
+                    prev_total_steps = total_steps; 
+                }
+
+                if (distance_decimal > 9){
+                	distance_decimal = 0;
+                	distance++;
+                }
+            
                 update_total_steps(spi1_dev, gpio0_dev, total_steps);
-                distance = rand() % 10; // Random distance between 0 and 9
-                distance_decimal = rand() % 10; // Random decimal part
                 update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
                 break;
 
             case WEATHER_SCREEN:
-                temp = rand() % 50 + 50; // Random temperature between 50 and 100
-                humidity = rand() % 101; // Random humidity between 0 and 100
-                aqi = rand() % 500; // Random AQI between 0 and 500
-                pressure = rand() % 40 + 950; // Random pressure between 950 and 990
-                pressure_decimal = rand() % 10; // Random decimal part
-                update_weather_data(spi1_dev, gpio0_dev, temp, humidity, aqi, pressure, pressure_decimal);
-                break;
+            temp = (int)d->weather_temp;
+            humidity = d->humidity; // Random humidity between 0 and 100
+            raw_gas = (int)d->aqi; // Random AQI between 0 and 500
+
+            // IAQ Calculation
+            double gas_baseline = 13500.0; // Adjust this baseline to your environment
+            double humidity_offset = 40.0; // Optimal indoor humidity level
+            double temperature_offset = 25.0; // Optimal indoor temperature level
+
+            // Adjust gas resistance based on humidity and temperature
+            double adjusted_gas_resistance = raw_gas * (1 + 0.02 * (humidity - humidity_offset) / humidity_offset);
+            adjusted_gas_resistance *= (1 + 0.02 * (temp - temperature_offset) / temperature_offset);
+
+            double iaq = 500 * (gas_baseline / adjusted_gas_resistance);
+            iaq = iaq < 0 ? 0 : (iaq > 500 ? 500 : iaq); // Clamp IAQ between 0 and 500
+
+            aqi = (int)iaq; // Convert IAQ to AQI for display
+
+            // Convert pressure from Pa to inHg
+            pressure = d->pressure; // Random pressure in Pa
+            double pressure_inhg = pressure * 0.0002953;
+            pressure_decimal = (int)((pressure_inhg - (int)pressure_inhg) * 10); // Decimal part in hundredths
+            int pressure_int = (int)pressure_inhg;
+
+            int temp_f = (temp * 9 / 5) + 32;
+
+            update_weather_data(spi1_dev, gpio0_dev, temp_f, humidity, aqi, pressure_int, pressure_decimal);
+            break;
+
 
             case WARNING_SCREEN:
                 // Example alert, you can add more detailed alert handling here
@@ -1307,13 +1347,23 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
 
         k_msleep(1000); // Wait for 1 second
 
-        // Change state every 10 seconds
-        static int elapsed_time = 0;
-        elapsed_time += 1000;
-        if (elapsed_time >= 10000) {
-            current_state = (current_state + 1) % NUM_SCREENS;
+        // Check for rotary encoder input
+        if (cw_detected || ccw_detected) {
+            if (current_state == WARNING_SCREEN) {
+                current_state = HEART_RATE_SCREEN;
+            } else {
+                if (cw_detected) {
+                    current_state = (current_state + 1) % (NUM_SCREENS - 1); // Skip the WARNING_SCREEN
+                } else if (ccw_detected) {
+                    current_state = (current_state == 0) ? NUM_SCREENS - 2 : current_state - 1; // Skip the WARNING_SCREEN
+                }
+            }
             setup_done = false;
-            elapsed_time = 0;
+            cw_detected = false;
+            ccw_detected = false;
         }
+
+
+        
     }
 }
