@@ -693,6 +693,10 @@ void get_formatted_time_and_date(char *buffer, size_t buf_len) {
     struct timespec ts;
     struct tm *tm;
     clock_gettime(CLOCK_REALTIME, &ts);  // Get current time
+    ts.tv_sec = 1716499235;
+    
+    // draw_number(spi1_dev, gpio0_dev, (int)ts.tv_sec, 0, 0, 0xFFFF, 0x0000, 4);
+    // LOG_INF("time: %ld", ts.tv_sec);
     tm = gmtime(&ts.tv_sec);             // Convert to struct tm
 
     // Month abbreviations

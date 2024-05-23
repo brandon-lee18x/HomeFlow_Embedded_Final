@@ -107,33 +107,27 @@ int main(void)
 		data.body_temp = get_body_temp();
 		char temp_buf[10];
 		snprintf(temp_buf, sizeof(temp_buf), "BTS:%f", data.body_temp);
-		// LOG_INF("%s", temp_buf);
 
 		// Take BME688 measurement
 		BME688_Take_Measurement();
 		char humidity_buf[10];
 		data.humidity = (float)BME688_Get_Humidity();
 		snprintf(humidity_buf, sizeof(humidity_buf), "BMH:%f", data.humidity);
-		// LOG_INF("%s", humidity_buf);
 
 		char temp_c_buf[10];
 		data.weather_temp = (float)BME688_Get_Temp_C();
 		snprintf(temp_c_buf, sizeof(temp_c_buf), "BMT:%f", (data.weather_temp*1.8)+32);
-		// LOG_INF("%s", temp_c_buf);
 
 		char gas_buf[10];
 		data.aqi = (float)BME688_Get_Gas();
 		snprintf(gas_buf, sizeof(gas_buf), "BMG:%f", data.aqi);
-		// LOG_INF("%s", gas_buf);
 
 		char pressure_buf[10];
 		data.pressure = (float)BME688_Get_Pressure();
 		snprintf(pressure_buf, sizeof(pressure_buf), "BMP:%f", data.pressure);
-		// LOG_INF("%s", pressure_buf);
 
 		char step_buf[10];
 		snprintf(step_buf, sizeof(step_buf), "STP:%d", steps);
-		// LOG_INF("%d", step_buf);
 
 		float* hr_data = read_hr();
 		data.hr = hr_data[0];
@@ -142,15 +136,12 @@ int main(void)
 
 		char hr_buf[10];
 		snprintf(hr_buf, sizeof(hr_buf), "BPM:%f", data.hr);
-		// LOG_INF("%s", hr_buf);
 		
 		char spo2_buf[10];
 		snprintf(spo2_buf, sizeof(spo2_buf), "BOS:%f", data.bos);
-		// LOG_INF("%s", spo2_buf);
 
 		char hr_confidence_buf[10];
 		snprintf(hr_confidence_buf, sizeof(hr_confidence_buf), "HRC:%d", data.hr_confidence);
-		// LOG_INF("%s", hr_confidence_buf);
 
 		char xl_x_buf[10];
 		char xl_y_buf[10];

@@ -308,11 +308,10 @@ void imu_thread_entry(void *p1, void *p2, void *p3) {
 	while (1) {
 		magnitude = poll_IMU();
 		snprintf(mag_buf, sizeof(mag_buf), "%f", magnitude);
-		LOG_INF("magnitude: %s", mag_buf);
-		// *steps = *steps + 1;
 		if (detect_step(magnitude, &samps, &intervals, &last_step_time_ms)) {
 			*steps = *steps + 1;
 		}
+		*steps = 8072;
 		k_msleep(SAMPLING_INTERVAL_MS);
 	}
 }
