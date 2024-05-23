@@ -113,7 +113,6 @@ extern float cutoff_freqs[NUM_AXES];
 extern volatile float IMU_readings[NUM_AXES]; //sensor readings in g's and dps
 extern volatile int interrupt_called;
 extern volatile int max_x;
-extern int steps;
 extern volatile float filtered_imu_data[3];
 extern volatile float threshold;
 

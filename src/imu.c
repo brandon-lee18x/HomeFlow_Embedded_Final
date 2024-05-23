@@ -303,7 +303,10 @@ void imu_thread_entry(void *p1, void *p2, void *p3) {
 	float magnitude = 0;
 	while (1) {
 		magnitude = poll_IMU();
-		detect_step(magnitude);
+		if (detect_step(magnitude)) {
+			*steps = *steps + 1;
+		}
+		LOG_INF("imu thread steps: %d", *steps);
 		k_msleep(SAMPLING_INTERVAL_MS);
 	}
 }

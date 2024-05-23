@@ -38,7 +38,7 @@
 #define LOG_MODULE_NAME peripheral_uart
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
-#define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE
+#define STACKSIZE 1024
 #define PRIORITY 7
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
@@ -637,9 +637,8 @@ void initialize_ble() {
 	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad), sd,
 			      ARRAY_SIZE(sd));
 	if (err) {
+		LOG_ERR("Advertising failed to start (err %d)", err);
 		return 0;
 	}
-
-	k_sleep(K_MSEC(3000));
 
 }

@@ -1224,6 +1224,7 @@ typedef enum {
 void display_thread_entry(void *p1, void *p2, void *p3) {
     DisplayState current_state = HEART_RATE_SCREEN;
     sensor_data* d = (sensor_data*)p1;
+    int* steps = (int*)p2;
     bool setup_done = false;
     int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance = 0, distance_decimal = 0, temp, humidity, raw_gas, aqi, pressure, pressure_decimal;
     int prev_total_steps = 0, prev_hr = 0, prev_blood_oxygen = 0;
@@ -1290,7 +1291,8 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
                 break;
             case ACTIVITY_SCREEN:
-                total_steps = d->steps;
+                total_steps = *steps;
+                LOG_INF("total steps: %d", total_steps);
                 if ((total_steps % 200 == 0) && (total_steps != prev_total_steps)){
                 	distance_decimal++;
                     prev_total_steps = total_steps; 
