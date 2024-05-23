@@ -28,7 +28,15 @@ typedef struct {
     float pressure;
 } sensor_data;
 
-
+typedef enum {
+    HEART_RATE_SCREEN,
+    BLOOD_OXYGEN_SCREEN,
+    BODY_TEMP_SCREEN,
+    ACTIVITY_SCREEN,
+    WEATHER_SCREEN,
+    WARNING_SCREEN,
+    NUM_SCREENS // This should always be the last element
+} DisplayState;
 
 // Function to initialize the display
 void main_display_init(const struct device *spi1_dev, const struct device *gpio0_dev, uint16_t backgroundColor, uint16_t heartColor);

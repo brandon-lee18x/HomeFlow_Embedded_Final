@@ -1228,63 +1228,23 @@ uint16_t backgroundColor = 0x0000;
 uint16_t textColor = 0xFFFF; 
 uint16_t heartColor = 0xFE60;
 
-// Define states for the state machine
-typedef enum {
-    HEART_RATE_SCREEN,
-    BLOOD_OXYGEN_SCREEN,
-    BODY_TEMP_SCREEN,
-    ACTIVITY_SCREEN,
-    WEATHER_SCREEN,
-    WARNING_SCREEN,
-    NUM_SCREENS // This should always be the last element
-} DisplayState;
-int test = 0;
 void display_thread_entry(void *p1, void *p2, void *p3) {
-    DisplayState current_state = HEART_RATE_SCREEN;
+    DisplayState display_state = HEART_RATE_SCREEN;
     sensor_data* d = (sensor_data*)p1;
     int* steps = (int*)p2;
     bool setup_done = false;
-    int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance = 0, distance_decimal = 0, temp, humidity, raw_gas, aqi, pressure, pressure_decimal;
+    int heart_rate, blood_oxygen, body_temp, body_temp_decimal, total_steps, distance = 0, distance_decimal = 0, temp,
+        humidity, raw_gas, aqi, pressure, pressure_decimal;
     int prev_total_steps = 0, prev_hr = 0, prev_blood_oxygen = 0;
-    //bool cw_detected = false;
-    //bool ccw_detected = false;
-
-    // Seed the random number generator
-    srand(time(NULL));
 
     main_display_init(spi1_dev, gpio0_dev, backgroundColor, heartColor);
+    setup_heartrate_screen(spi1_dev, gpio0_dev);
 
     while (1) {
-        // Check if setup is needed for the current state
-        if (!setup_done) {
-            switch (current_state) {
-                case HEART_RATE_SCREEN:
-                    setup_heartrate_screen(spi1_dev, gpio0_dev);
-                    break;
-                case BODY_TEMP_SCREEN:
-                    setup_bodytemp_screen(spi1_dev, gpio0_dev);
-                    break;
-                case ACTIVITY_SCREEN:
-                    setup_activity_screen(spi1_dev, gpio0_dev);
-                    break;
-                case WEATHER_SCREEN:
-                    setup_weather_screen(spi1_dev, gpio0_dev);
-                    break;
-                case WARNING_SCREEN:
-                    setup_warning_screen(spi1_dev, gpio0_dev, "fall_detected"); // Example alert
-                    break;
-                default:
-                    break;
-            }
-            setup_done = true;
-        }
-
-        // Update screen every second with random values
-        switch (current_state) {
+        switch (display_state) {
             case HEART_RATE_SCREEN:
                 heart_rate = d->hr;
                 blood_oxygen = d->bos;
-
                 if(heart_rate == 0){
                     update_heart_rate(spi1_dev, gpio0_dev, prev_hr);
                 }
@@ -1299,8 +1259,17 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                     update_blood_oxygen(spi1_dev, gpio0_dev, blood_oxygen);
                     prev_blood_oxygen = blood_oxygen;
                 }
-                
                 display_time_and_date(spi1_dev, gpio0_dev);
+                if (cw_detected) {
+                    cw_detected = false;
+                    display_state = BODY_TEMP_SCREEN;
+                    setup_bodytemp_screen(spi1_dev, gpio0_dev);
+                }
+                else if (ccw_detected) {
+                    ccw_detected = false;
+                    display_state = WEATHER_SCREEN;
+                    setup_weather_screen(spi1_dev, gpio0_dev);
+                }
                 break;
             case BODY_TEMP_SCREEN:
                 body_temp = d->body_temp;
@@ -1308,97 +1277,88 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                // body_temp = body_temp + 17; //Calibrationg
                 update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
                 display_time_and_date(spi1_dev, gpio0_dev);
+                if (cw_detected) {
+                    cw_detected = false;
+                    display_state = ACTIVITY_SCREEN;
+                    setup_activity_screen(spi1_dev, gpio0_dev);
+                }
+                else if (ccw_detected) {
+                    ccw_detected = false;
+                    display_state = HEART_RATE_SCREEN;
+                    setup_heartrate_screen(spi1_dev, gpio0_dev);
+                }
                 break;
             case ACTIVITY_SCREEN:
                 total_steps = *steps;
-
                 distance = (int)(total_steps / 2000); 
                 distance_decimal = (int)((total_steps % 2000) / 200); 
                 update_total_steps(spi1_dev, gpio0_dev, total_steps);
                 update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
-
-
-                // distance = (int)(total_steps / 2000); 
-                // distance_decimal = (int)((total_steps % 2000) / 200); 
-                // update_total_steps(spi1_dev, gpio0_dev, total_steps);
-                // update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
                 display_time_and_date(spi1_dev, gpio0_dev);
+                if (cw_detected) {
+                    cw_detected = false;
+                    display_state = WEATHER_SCREEN;
+                    setup_weather_screen(spi1_dev, gpio0_dev);
+                }
+                else if (ccw_detected) {
+                    ccw_detected = false;
+                    display_state = BODY_TEMP_SCREEN;
+                    setup_bodytemp_screen(spi1_dev, gpio0_dev);
+                }
                 break;
-
             case WEATHER_SCREEN:
-            temp = (int)d->weather_temp;
-            humidity = d->humidity; // Random humidity between 0 and 100
-            raw_gas = (int)d->aqi; // Random AQI between 0 and 500
+                temp = (int)d->weather_temp;
+                humidity = d->humidity; // Random humidity between 0 and 100
+                raw_gas = (int)d->aqi; // Random AQI between 0 and 500
 
-            double baseline_resistance = 20000.0;  // Baseline resistance in ohms for clean air
-            double factor = raw_gas / baseline_resistance;
-            
-            // More detailed empirical mapping to AQI
-            double aqi;
-            if (factor >= 1) {
-                aqi = 50 - (factor - 1) * 50;  // Decrease linearly below factor of 1
-            } else if (factor >= 0.8) {
-                aqi = 100 - (factor - 0.8) * 250;  // Decrease linearly below factor of 0.8
-            } else if (factor >= 0.6) {
-                aqi = 150 - (factor - 0.6) * 250;  // Decrease linearly below factor of 0.6
-            } else if (factor >= 0.4) {
-                aqi = 200 - (factor - 0.4) * 500;  // Decrease linearly below factor of 0.4
-            } else if (factor >= 0.2) {
-                aqi = 300 - (factor - 0.2) * 500;  // Decrease linearly below factor of 0.2
-            } else {
-                aqi = 500;  // Hazardous level for very low factors
-            }
-            
-            // Clamp the AQI value between 0 and 500
-            if (aqi < 0) aqi = 0;
-            if (aqi > 500) aqi = 500;
-
-
-            // Convert pressure from Pa to inHg
-            pressure = d->pressure; // Random pressure in Pa
-            double pressure_inhg = pressure * 0.0002953;
-            pressure_decimal = (int)((pressure_inhg - (int)pressure_inhg) * 10); // Decimal part in hundredths
-            int pressure_int = (int)pressure_inhg;
-
-            int temp_f = (temp * 9 / 5) + 32;
-
-            update_weather_data(spi1_dev, gpio0_dev, temp_f, humidity, aqi, pressure_int, pressure_decimal);
-            display_time_and_date(spi1_dev, gpio0_dev);
-            break;
+                double baseline_resistance = 20000.0;  // Baseline resistance in ohms for clean air
+                double factor = raw_gas / baseline_resistance;
+                
+                // More detailed empirical mapping to AQI
+                double aqi;
+                if (factor >= 1) {
+                    aqi = 50 - (factor - 1) * 50;  // Decrease linearly below factor of 1
+                } else if (factor >= 0.8) {
+                    aqi = 100 - (factor - 0.8) * 250;  // Decrease linearly below factor of 0.8
+                } else if (factor >= 0.6) {
+                    aqi = 150 - (factor - 0.6) * 250;  // Decrease linearly below factor of 0.6
+                } else if (factor >= 0.4) {
+                    aqi = 200 - (factor - 0.4) * 500;  // Decrease linearly below factor of 0.4
+                } else if (factor >= 0.2) {
+                    aqi = 300 - (factor - 0.2) * 500;  // Decrease linearly below factor of 0.2
+                } else {
+                    aqi = 500;  // Hazardous level for very low factors
+                }
+                
+                // Clamp the AQI value between 0 and 500
+                if (aqi < 0) aqi = 0;
+                if (aqi > 500) aqi = 500;
 
 
+                // Convert pressure from Pa to inHg
+                pressure = d->pressure; // Random pressure in Pa
+                double pressure_inhg = pressure * 0.0002953;
+                pressure_decimal = (int)((pressure_inhg - (int)pressure_inhg) * 10); // Decimal part in hundredths
+                int pressure_int = (int)pressure_inhg;
+
+                int temp_f = (temp * 9 / 5) + 32;
+
+                update_weather_data(spi1_dev, gpio0_dev, temp_f, humidity, aqi, pressure_int, pressure_decimal);
+                display_time_and_date(spi1_dev, gpio0_dev);
+                if (cw_detected) {
+                    cw_detected = false;
+                    display_state = HEART_RATE_SCREEN;
+                    setup_heartrate_screen(spi1_dev, gpio0_dev);
+                }
+                else if (ccw_detected) {
+                    ccw_detected = false;
+                    display_state = ACTIVITY_SCREEN;
+                    setup_activity_screen(spi1_dev, gpio0_dev);
+                }
+                break;
             case WARNING_SCREEN:
-                // Example alert, you can add more detailed alert handling here
                 setup_warning_screen(spi1_dev, gpio0_dev, "fall_detected");
                 break;
-
-            default:
-                break;
         }
-
-        k_msleep(1000); // Wait for 1 second
-
-        // Check for rotary encoder input
-        if (cw_detected || ccw_detected) {
-            last_displayed_text[128] = "";
-            max_width_num_drawn_centered = 0;
-            last_displayed_number[12] = "";  
-            max_width_num_drawn = 0;
-            if (current_state == WARNING_SCREEN) {
-                current_state = HEART_RATE_SCREEN;
-            } else {
-                if (cw_detected) {
-                    current_state = (current_state + 1) % (NUM_SCREENS - 1); // Skip the WARNING_SCREEN
-                } else if (ccw_detected) {
-                    current_state = (current_state == 0) ? NUM_SCREENS - 2 : current_state - 1; // Skip the WARNING_SCREEN
-                }
-            }
-            setup_done = false;
-            cw_detected = false;
-            ccw_detected = false;
-        }
-
-
-        
     }
 }
