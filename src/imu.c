@@ -300,13 +300,19 @@ void print_filtered_readings() {
 
 void imu_thread_entry(void *p1, void *p2, void *p3) {
 	int* steps = (int*)p1;
+	ring_buf samps;
+	ring_buf intervals;
+	long last_step_time_ms = 0;
 	float magnitude = 0;
+	char mag_buf[20];
 	while (1) {
 		magnitude = poll_IMU();
-		if (detect_step(magnitude)) {
+		snprintf(mag_buf, sizeof(mag_buf), "%f", magnitude);
+		LOG_INF("magnitude: %s", mag_buf);
+		// *steps = *steps + 1;
+		if (detect_step(magnitude, &samps, &intervals, &last_step_time_ms)) {
 			*steps = *steps + 1;
 		}
-		LOG_INF("imu thread steps: %d", *steps);
 		k_msleep(SAMPLING_INTERVAL_MS);
 	}
 }
@@ -344,33 +350,24 @@ float butterworth_filter(ButterworthFilter* filter, float input) {
 #define RECENT_STEP_COUNT 5  // Number of recent steps to keep track of for interval averaging
 #define INITIAL_THRESHOLD 2
 
-volatile float step_threshold = 0.9;
-
-ring_buf samps;
-ring_buf intervals;
-long last_step_time_ms = 0;
-const float time_window_ms = 250;
-
 // Function to detect steps
-bool detect_step(float magnitude) {
+bool detect_step(float magnitude, ring_buf* samps, ring_buf* intervals, long* last_step_time_ms) {
 	// LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude)*1000));
-
+	float step_threshold = 1.1;
 	//insert reading into samps and calc avg
-	insert_val(magnitude, &samps);
-	float samp_avg = get_rolling_avg(&samps);
+	insert_val(magnitude, samps);
+	float samp_avg = get_rolling_avg(samps);
 
-	uint32_t step_period = k_uptime_get() - last_step_time_ms;
+	uint32_t step_period = k_uptime_get() - *last_step_time_ms;
+	long test = 0;
 
-    if (samp_avg > step_threshold && step_period > time_window_ms) {
-		insert_val(step_period, &intervals);
-		float interval_avg = get_rolling_avg(&intervals);
-		if (step_period > 0.7 * interval_avg) {
-			last_step_time_ms = k_uptime_get();
-		}
+    if (magnitude > step_threshold && step_period > 250) {
+		// insert_val(step_period, intervals);
+		// float interval_avg = get_rolling_avg(intervals);
+		// if (step_period > 0.7 * interval_avg) {
+		// 	*last_step_time_ms = k_uptime_get();
+		// }
 		return true;
 	}
 	return false;
-
-	// LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
-	// LOG_INF("Steps: %d", steps);
 }

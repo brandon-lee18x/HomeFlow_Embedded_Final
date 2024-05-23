@@ -1311,13 +1311,10 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 break;
             case ACTIVITY_SCREEN:
                 total_steps = *steps;
-                LOG_INF("total steps: %d", total_steps);
-                
-                test+= 300;
 
-                distance = (int)(test / 2000); 
-                distance_decimal = (int)((test % 2000) / 200); 
-                update_total_steps(spi1_dev, gpio0_dev, test);
+                distance = (int)(total_steps / 2000); 
+                distance_decimal = (int)((total_steps % 2000) / 200); 
+                update_total_steps(spi1_dev, gpio0_dev, total_steps);
                 update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
 
 

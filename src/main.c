@@ -38,7 +38,7 @@ const struct device* gpio1_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
 const struct device* gpio0_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 const struct device* spi1_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
 
-#define IMU_STACK_SIZE 1024
+#define IMU_STACK_SIZE 2048
 #define IMU_PRIORITY 8
 K_THREAD_STACK_DEFINE(imu_thread_stack, IMU_STACK_SIZE);
 struct k_thread imu_thread_data;
@@ -79,7 +79,7 @@ int main(void)
 	// IMU init
 	init_IMU_cs();
 	init_IMU();
-	init_IMU_interrupts();
+	// init_IMU_interrupts();
 	init_RCFilters();
 
 	//r_enc init

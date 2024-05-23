@@ -129,6 +129,6 @@ float calc_magnitude(float x, float y, float z);
 float ema_filter(float new_mag, float old_mag);
 void init_butterworth_filter(ButterworthFilter* filter);
 float butterworth_filter(ButterworthFilter* filter, float input);
-bool detect_step(float magnitude);
+bool detect_step(float magnitude, ring_buf* samps, ring_buf* intervals, long* last_step_time_ms);
 
 #endif
