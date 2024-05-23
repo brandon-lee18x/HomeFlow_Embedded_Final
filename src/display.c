@@ -961,12 +961,6 @@ void setup_weather_screen(const struct device *spi_dev, const struct device *gpi
     // Labels for Pressure
     draw_text(spi_dev, gpio_dev, "Pressure", pressure_x, pressure_y + 10, label_color, bg_color, 2);
 
-    // Units
-    draw_text(spi_dev, gpio_dev, "@", air_temp_x + 44, air_temp_y + 58, value_color, bg_color, 2);
-    draw_text(spi_dev, gpio_dev, "F", air_temp_x + 57, air_temp_y + 60, value_color, bg_color, 2);
-    draw_text(spi_dev, gpio_dev, "AQI", air_quality_x + 70, air_quality_y + 80, value_color, bg_color, 2);
-    draw_text(spi_dev, gpio_dev, "%", 76, 250, value_color, bg_color, 3);
-    draw_text(spi_dev, gpio_dev, "inHG", pressure_x + 60, pressure_y + 50, value_color, bg_color, 2);
 }
 
 void update_weather_data(const struct device *spi_dev, const struct device *gpio_dev, int temp, int humidity, int aqi, int pressure, int pressure_decimal) {
@@ -984,7 +978,16 @@ void update_weather_data(const struct device *spi_dev, const struct device *gpio
     draw_number(spi_dev, gpio_dev, humidity, humidity_x, humidity_y, value_color, bg_color, 3);
 
     // Update pressure with decimal
-    draw_number(spi_dev, gpio_dev, pressure, pressure_x, pressure_y, value_color, bg_color, 3);
+    if (pressure < 10){
+        st7789v_fill_rect_optimized(spi_dev, gpio_dev, pressure_x, pressure_y, 15, 25, 0x0000);
+        draw_number(spi_dev, gpio_dev, pressure, pressure_x + 16, pressure_y, value_color, bg_color, 3);
+    } else if(pressure < 100){
+        draw_number(spi_dev, gpio_dev, pressure, pressure_x, pressure_y, value_color, bg_color, 3);
+    } else{
+        pressure = 15;
+        draw_number(spi_dev, gpio_dev, pressure, pressure_x, pressure_y, value_color, bg_color, 3);
+    }
+    
     draw_number_decimal(spi_dev, gpio_dev, pressure_decimal, pressure_x + 50, pressure_y, value_color, bg_color, 3);
 
     // Draw the decimal point
@@ -1013,6 +1016,21 @@ void update_weather_data(const struct device *spi_dev, const struct device *gpio
     } else {
         draw_text(spi_dev, gpio_dev, "All Clear", warning_x, warning_y, greenColor, bg_color, 3);
     }
+
+    
+    bg_color = 0x0000;     // Black background
+    value_color = 0xFFFF;  // Green color for values
+
+    // Define the positions for each quadrant
+    air_temp_x = 40, air_temp_y = 50;
+    air_quality_x = 160, air_quality_y = 50;
+    humidity_x = 15, humidity_y = 205;
+    pressure_x = 130, pressure_y = 205;
+
+    draw_text(spi_dev, gpio_dev, "@", air_temp_x + 44, air_temp_y + 58, value_color, bg_color, 2);
+    draw_text(spi_dev, gpio_dev, "F", air_temp_x + 57, air_temp_y + 60, value_color, bg_color, 2);
+    draw_text(spi_dev, gpio_dev, "%", 76, 250, value_color, bg_color, 3);
+    draw_text(spi_dev, gpio_dev, "inHG", pressure_x + 60, pressure_y + 50, value_color, bg_color, 2);
 
 }
 
@@ -1220,7 +1238,7 @@ typedef enum {
     WARNING_SCREEN,
     NUM_SCREENS // This should always be the last element
 } DisplayState;
-
+int test = 0;
 void display_thread_entry(void *p1, void *p2, void *p3) {
     DisplayState current_state = HEART_RATE_SCREEN;
     sensor_data* d = (sensor_data*)p1;
@@ -1282,29 +1300,32 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                     prev_blood_oxygen = blood_oxygen;
                 }
                 
-
+                display_time_and_date(spi1_dev, gpio0_dev);
                 break;
             case BODY_TEMP_SCREEN:
                 body_temp = d->body_temp;
                 body_temp_decimal = (int)((d->body_temp - body_temp) * 10);
-                body_temp = body_temp + 17; //Calibrationg
+               // body_temp = body_temp + 17; //Calibrationg
                 update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
+                display_time_and_date(spi1_dev, gpio0_dev);
                 break;
             case ACTIVITY_SCREEN:
                 total_steps = *steps;
                 LOG_INF("total steps: %d", total_steps);
-                if ((total_steps % 200 == 0) && (total_steps != prev_total_steps)){
-                	distance_decimal++;
-                    prev_total_steps = total_steps; 
-                }
+                
+                test+= 300;
 
-                if (distance_decimal > 9){
-                	distance_decimal = 0;
-                	distance++;
-                }
-            
-                update_total_steps(spi1_dev, gpio0_dev, total_steps);
+                distance = (int)(test / 2000); 
+                distance_decimal = (int)((test % 2000) / 200); 
+                update_total_steps(spi1_dev, gpio0_dev, test);
                 update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
+
+
+                // distance = (int)(total_steps / 2000); 
+                // distance_decimal = (int)((total_steps % 2000) / 200); 
+                // update_total_steps(spi1_dev, gpio0_dev, total_steps);
+                // update_distance(spi1_dev, gpio0_dev, distance, distance_decimal);
+                display_time_and_date(spi1_dev, gpio0_dev);
                 break;
 
             case WEATHER_SCREEN:
@@ -1312,19 +1333,29 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
             humidity = d->humidity; // Random humidity between 0 and 100
             raw_gas = (int)d->aqi; // Random AQI between 0 and 500
 
-            // IAQ Calculation
-            double gas_baseline = 13500.0; // Adjust this baseline to your environment
-            double humidity_offset = 40.0; // Optimal indoor humidity level
-            double temperature_offset = 25.0; // Optimal indoor temperature level
+            double baseline_resistance = 20000.0;  // Baseline resistance in ohms for clean air
+            double factor = raw_gas / baseline_resistance;
+            
+            // More detailed empirical mapping to AQI
+            double aqi;
+            if (factor >= 1) {
+                aqi = 50 - (factor - 1) * 50;  // Decrease linearly below factor of 1
+            } else if (factor >= 0.8) {
+                aqi = 100 - (factor - 0.8) * 250;  // Decrease linearly below factor of 0.8
+            } else if (factor >= 0.6) {
+                aqi = 150 - (factor - 0.6) * 250;  // Decrease linearly below factor of 0.6
+            } else if (factor >= 0.4) {
+                aqi = 200 - (factor - 0.4) * 500;  // Decrease linearly below factor of 0.4
+            } else if (factor >= 0.2) {
+                aqi = 300 - (factor - 0.2) * 500;  // Decrease linearly below factor of 0.2
+            } else {
+                aqi = 500;  // Hazardous level for very low factors
+            }
+            
+            // Clamp the AQI value between 0 and 500
+            if (aqi < 0) aqi = 0;
+            if (aqi > 500) aqi = 500;
 
-            // Adjust gas resistance based on humidity and temperature
-            double adjusted_gas_resistance = raw_gas * (1 + 0.02 * (humidity - humidity_offset) / humidity_offset);
-            adjusted_gas_resistance *= (1 + 0.02 * (temp - temperature_offset) / temperature_offset);
-
-            double iaq = 500 * (gas_baseline / adjusted_gas_resistance);
-            iaq = iaq < 0 ? 0 : (iaq > 500 ? 500 : iaq); // Clamp IAQ between 0 and 500
-
-            aqi = (int)iaq; // Convert IAQ to AQI for display
 
             // Convert pressure from Pa to inHg
             pressure = d->pressure; // Random pressure in Pa
@@ -1335,6 +1366,7 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
             int temp_f = (temp * 9 / 5) + 32;
 
             update_weather_data(spi1_dev, gpio0_dev, temp_f, humidity, aqi, pressure_int, pressure_decimal);
+            display_time_and_date(spi1_dev, gpio0_dev);
             break;
 
 
@@ -1351,6 +1383,10 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
 
         // Check for rotary encoder input
         if (cw_detected || ccw_detected) {
+            last_displayed_text[128] = "";
+            max_width_num_drawn_centered = 0;
+            last_displayed_number[12] = "";  
+            max_width_num_drawn = 0;
             if (current_state == WARNING_SCREEN) {
                 current_state = HEART_RATE_SCREEN;
             } else {
