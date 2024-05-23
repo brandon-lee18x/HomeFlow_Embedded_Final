@@ -191,11 +191,11 @@ void init_IMU_cs() {
     gpio_pin_configure(gpio1_dev, GPIO_1_CS, GPIO_OUTPUT | GPIO_OUTPUT_INIT_HIGH);
 }
 
-void poll_IMU() {
+float poll_IMU() {
     if (interrupt_called) {
-			print_unfiltered_readings();
-			printk("max xl_x: %d\n", max_x);
-			printk("interrupt fired\n");
+			// print_unfiltered_readings();
+			// printk("max xl_x: %d\n", max_x);
+			// printk("interrupt fired\n");
 			interrupt_called = 0;
 	}
 
@@ -250,14 +250,13 @@ void poll_IMU() {
 	}
 
 	char xl_x_filtered_buf[10], xl_y_filtered_buf[10], xl_z_filtered_buf[10];
-	snprintf(xl_x_filtered_buf, sizeof(xl_x_filtered_buf), "%f", filtered_readings[XL_X_IND]);
-	snprintf(xl_y_filtered_buf, sizeof(xl_y_filtered_buf), "%f", filtered_readings[XL_Y_IND]);
-	snprintf(xl_z_filtered_buf, sizeof(xl_z_filtered_buf), "%f", filtered_readings[XL_Z_IND]);
+	// snprintf(xl_x_filtered_buf, sizeof(xl_x_filtered_buf), "%f", filtered_readings[XL_X_IND]);
+	// snprintf(xl_y_filtered_buf, sizeof(xl_y_filtered_buf), "%f", filtered_readings[XL_Y_IND]);
+	// snprintf(xl_z_filtered_buf, sizeof(xl_z_filtered_buf), "%f", filtered_readings[XL_Z_IND]);
 	// LOG_INF("xl_x: %s     xl_y: %s     xl_z: %s", xl_x_filtered_buf, xl_y_filtered_buf, xl_z_filtered_buf);
 
 	float mag = calc_magnitude(filtered_readings[XL_X_IND], filtered_readings[XL_Y_IND], filtered_readings[XL_Z_IND]);
-	prev_magnitude = mag;
-	detect_step(mag);
+	return mag;
 }
 
 //helper function to be called in main
@@ -300,8 +299,20 @@ void print_filtered_readings() {
 }
 
 void imu_thread_entry(void *p1, void *p2, void *p3) {
+	int* steps = (int*)p1;
+	ring_buf samps;
+	ring_buf intervals;
+	long last_step_time_ms = 0;
+	float magnitude = 0;
+	char mag_buf[20];
 	while (1) {
-		poll_IMU();
+		magnitude = poll_IMU();
+		snprintf(mag_buf, sizeof(mag_buf), "%f", magnitude);
+		LOG_INF("magnitude: %s", mag_buf);
+		// *steps = *steps + 1;
+		if (detect_step(magnitude, &samps, &intervals, &last_step_time_ms)) {
+			*steps = *steps + 1;
+		}
 		k_msleep(SAMPLING_INTERVAL_MS);
 	}
 }
@@ -339,32 +350,24 @@ float butterworth_filter(ButterworthFilter* filter, float input) {
 #define RECENT_STEP_COUNT 5  // Number of recent steps to keep track of for interval averaging
 #define INITIAL_THRESHOLD 2
 
-volatile float step_threshold = 0.9;
-
-ring_buf samps;
-ring_buf intervals;
-long last_step_time_ms = 0;
-const float time_window_ms = 250;
-
 // Function to detect steps
-void detect_step(float magnitude) {
+bool detect_step(float magnitude, ring_buf* samps, ring_buf* intervals, long* last_step_time_ms) {
 	// LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude)*1000));
-
+	float step_threshold = 1.1;
 	//insert reading into samps and calc avg
-	insert_val(magnitude, &samps);
-	float samp_avg = get_rolling_avg(&samps);
+	insert_val(magnitude, samps);
+	float samp_avg = get_rolling_avg(samps);
 
-	uint32_t step_period = k_uptime_get() - last_step_time_ms;
+	uint32_t step_period = k_uptime_get() - *last_step_time_ms;
+	long test = 0;
 
-    if (samp_avg > step_threshold && step_period > time_window_ms) {
-		insert_val(step_period, &intervals);
-		float interval_avg = get_rolling_avg(&intervals);
-		if (step_period > 0.7 * interval_avg) {
-			last_step_time_ms = k_uptime_get();
-		}
-		steps++;
+    if (magnitude > step_threshold && step_period > 250) {
+		// insert_val(step_period, intervals);
+		// float interval_avg = get_rolling_avg(intervals);
+		// if (step_period > 0.7 * interval_avg) {
+		// 	*last_step_time_ms = k_uptime_get();
+		// }
+		return true;
 	}
-
-	// LOG_INF("Threshold: %d.%d", (int)threshold, (int)((threshold - (int)threshold) * 1000));
-	LOG_INF("Steps: %d", steps);
+	return false;
 }

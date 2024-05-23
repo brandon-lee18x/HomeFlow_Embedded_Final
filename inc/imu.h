@@ -30,6 +30,7 @@ SDOAG/MISO (orange): P114
 #include <zephyr/logging/log.h>
 #include <math.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <stdbool.h>
 
 #include "rc_filter.h"
 #include "ring_buf.h"
@@ -112,7 +113,6 @@ extern float cutoff_freqs[NUM_AXES];
 extern volatile float IMU_readings[NUM_AXES]; //sensor readings in g's and dps
 extern volatile int interrupt_called;
 extern volatile int max_x;
-extern int steps;
 extern volatile float filtered_imu_data[3];
 extern volatile float threshold;
 
@@ -122,13 +122,13 @@ void init_IMU();
 void init_IMU_interrupts();
 void IMU_interrupt_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 void init_IMU_cs();
-void poll_IMU();
+float poll_IMU(); //returns magnitude as a pointer
 void init_RCFilters();
 void imu_thread_entry(void *p1, void *p2, void *p3);
 float calc_magnitude(float x, float y, float z);
 float ema_filter(float new_mag, float old_mag);
 void init_butterworth_filter(ButterworthFilter* filter);
 float butterworth_filter(ButterworthFilter* filter, float input);
-void detect_step(float magnitude);
+bool detect_step(float magnitude, ring_buf* samps, ring_buf* intervals, long* last_step_time_ms);
 
 #endif

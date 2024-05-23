@@ -19,6 +19,8 @@ target_sources(app PRIVATE
   src/hr.c
   src/display.c
   src/ring_buf.c
+  src/spi.c
+
 )
 
 # Include UART ASYNC API adapter

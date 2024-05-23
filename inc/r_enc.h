@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
+#include <stdbool.h>
 
 // Assign pins A, B, and BTN to P104, P105, & P106 respectively
 #define P0_03 3
@@ -19,6 +21,8 @@
 
 extern const struct device *gpio0_dev;
 extern const struct device *gpio1_dev;
+extern volatile bool cw_detected;
+extern volatile bool ccw_detected;
 
 //initialize gpios for encoder
 void init_enc();
