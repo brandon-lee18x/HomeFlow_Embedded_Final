@@ -1,6 +1,7 @@
 #ifndef RC_FILTER_H
 #define RC_FILTER_H
 
+//SW RC circuit filter
 typedef struct {
 	float coeff[2];
 	float out[2];

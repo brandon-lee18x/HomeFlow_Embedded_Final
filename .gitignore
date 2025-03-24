@@ -3,4 +3,6 @@
 *~
 
 # build
-/build*/
+*build*/
+.vscode/
+.idea/

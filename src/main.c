@@ -153,5 +153,5 @@ int main(void)
 			bt_nus_send(current_conn, xl_z_buf, strlen(xl_z_buf));
 		}
 	}
-	
+	return 0;
 }
