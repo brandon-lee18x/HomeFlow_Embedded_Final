@@ -34,6 +34,7 @@ SDOAG/MISO (orange): P114
 
 #include "rc_filter.h"
 #include "ring_buf.h"
+#include "mutexes.h"
 
 //relevant registers masks used for IMU
 #define CHIPID_REG_READ 0b10001111
@@ -122,7 +123,7 @@ void init_IMU();
 void init_IMU_interrupts();
 void IMU_interrupt_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
 void init_IMU_cs();
-float poll_IMU(); //returns magnitude as a pointer
+float poll_IMU(); //returns magnitude of IMU readings
 void init_RCFilters();
 void imu_thread_entry(void *p1, void *p2, void *p3);
 float calc_magnitude(float x, float y, float z);

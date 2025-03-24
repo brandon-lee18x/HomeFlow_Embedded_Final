@@ -1,0 +1,32 @@
+/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/aarch64/ninja -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ -G Ninja -S /Users/brandon/Documents/UCSB_Classes/ECE_189/homeflow_embedded_final -B /Users/brandon/Documents/UCSB_Classes/ECE_189/homeflow_embedded_final/cmake-build-debug
+Loading Zephyr default modules (Freestanding).
+-- Application: /Users/brandon/Documents/UCSB_Classes/ECE_189/homeflow_embedded_final
+-- CMake version: 3.30.5
+-- Using NCS Toolchain 2.5.20231017.141038581733 for building. (/opt/nordic/ncs/toolchains/20d68df7e5/cmake)
+CMake Deprecation Warning at /opt/nordic/ncs/v2.5.0/zephyr/cmake/modules/FindDeprecated.cmake:121 (message):
+  'PYTHON_PREFER' variable is deprecated.  Please use Python3_EXECUTABLE
+  instead.
+Call Stack (most recent call first):
+  /opt/nordic/ncs/v2.5.0/zephyr/cmake/modules/python.cmake:16 (find_package)
+  /opt/nordic/ncs/v2.5.0/zephyr/cmake/modules/zephyr_default.cmake:129 (include)
+  /opt/nordic/ncs/v2.5.0/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:66 (include)
+  /opt/nordic/ncs/v2.5.0/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:159 (include_boilerplate)
+  CMakeLists.txt:8 (find_package)
+
+
+-- Found Python3: /opt/nordic/ncs/toolchains/20d68df7e5/bin/python3 (found suitable version "3.9.6", minimum required is "3.8") found components: Interpreter
+-- Cache files will be written to: /Users/brandon/Library/Caches/zephyr
+-- Zephyr version: 3.4.99 (/opt/nordic/ncs/v2.5.0/zephyr)
+-- Found west (found suitable version "1.1.0", minimum required is "0.14.0")
+CMake Error at /opt/nordic/ncs/v2.5.0/zephyr/cmake/modules/extensions.cmake:2875 (message):
+  BOARD is not being defined on the CMake command-line, in the environment or
+  by the app.
+Call Stack (most recent call first):
+  /opt/nordic/ncs/v2.5.0/zephyr/cmake/modules/boards.cmake:56 (zephyr_check_cache)
+  /opt/nordic/ncs/v2.5.0/zephyr/cmake/modules/zephyr_default.cmake:129 (include)
+  /opt/nordic/ncs/v2.5.0/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:66 (include)
+  /opt/nordic/ncs/v2.5.0/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:159 (include_boilerplate)
+  CMakeLists.txt:8 (find_package)
+
+
+-- Configuring incomplete, errors occurred!

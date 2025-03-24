@@ -6,6 +6,7 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
 #include <stdbool.h>
+#include "mutexes.h"
 
 #define P0_03 3
 #define P0_04 4

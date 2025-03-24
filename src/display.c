@@ -1243,8 +1243,10 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
     while (1) {
         switch (display_state) {
             case HEART_RATE_SCREEN:
+                k_mutex_lock(&i2c_lock, K_FOREVER);
                 heart_rate = d->hr;
                 blood_oxygen = d->bos;
+                k_mutex_unlock(&i2c_lock);
                 if(heart_rate == 0){
                     update_heart_rate(spi1_dev, gpio0_dev, prev_hr);
                 }
@@ -1272,8 +1274,10 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 }
                 break;
             case BODY_TEMP_SCREEN:
+                k_mutex_lock(&i2c_lock, K_FOREVER);
                 body_temp = d->body_temp;
                 body_temp_decimal = (int)((d->body_temp - body_temp) * 10);
+                k_mutex_unlock(&i2c_lock);
                // body_temp = body_temp + 17; //Calibrationg
                 update_body_temp(spi1_dev, gpio0_dev, body_temp, body_temp_decimal);
                 display_time_and_date(spi1_dev, gpio0_dev);
@@ -1289,7 +1293,9 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 }
                 break;
             case ACTIVITY_SCREEN:
+                k_mutex_lock(&steps_lock, K_FOREVER);
                 total_steps = *steps;
+                k_mutex_unlock(&steps_lock);
                 distance = (int)(total_steps / 2000); 
                 distance_decimal = (int)((total_steps % 2000) / 200); 
                 update_total_steps(spi1_dev, gpio0_dev, total_steps);
@@ -1307,9 +1313,12 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 }
                 break;
             case WEATHER_SCREEN:
+                k_mutex_lock(&i2c_lock, K_FOREVER);
                 temp = (int)d->weather_temp;
                 humidity = d->humidity; // Random humidity between 0 and 100
                 raw_gas = (int)d->aqi; // Random AQI between 0 and 500
+                pressure = d->pressure; // Random pressure in Pa
+                k_mutex_unlock(&i2c_lock);
 
                 double baseline_resistance = 20000.0;  // Baseline resistance in ohms for clean air
                 double factor = raw_gas / baseline_resistance;
@@ -1329,17 +1338,15 @@ void display_thread_entry(void *p1, void *p2, void *p3) {
                 } else {
                     aqi = 500;  // Hazardous level for very low factors
                 }
+
+                // Convert pressure from Pa to inHg
+                double pressure_inhg = pressure * 0.0002953;
+                pressure_decimal = (int)((pressure_inhg - (int)pressure_inhg) * 10); // Decimal part in hundredths
+                int pressure_int = (int)pressure_inhg;
                 
                 // Clamp the AQI value between 0 and 500
                 if (aqi < 0) aqi = 0;
                 if (aqi > 500) aqi = 500;
-
-
-                // Convert pressure from Pa to inHg
-                pressure = d->pressure; // Random pressure in Pa
-                double pressure_inhg = pressure * 0.0002953;
-                pressure_decimal = (int)((pressure_inhg - (int)pressure_inhg) * 10); // Decimal part in hundredths
-                int pressure_int = (int)pressure_inhg;
 
                 int temp_f = (temp * 9 / 5) + 32;
 

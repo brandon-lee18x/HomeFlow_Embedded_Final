@@ -117,7 +117,7 @@ void init_IMU() {
 //enables IMU interrupt generation for certain axes, sets thresholds for desired axes (rn x axis low)
 void init_IMU_interrupts() {
 	/*
-	possibly relevant registers:
+	relevant registers:
 	INT_GEN_CFG_XL (06h) - need (enables interrupt generation for certain axes)
 	INT_GEN_THS_X/Y/Z_XL (07h) - need (threshold)
 	INT_GEN_DUR_XL (0Ah) - don't need (adds wait time after interrupt finishes execution)
@@ -169,8 +169,6 @@ void init_IMU_interrupts() {
         return;
 	}
 
-	// gpio_init_callback(&gpio_cb, IMU_interrupt_cb, BIT(PIN_1_02));
-	// gpio_add_callback(gpio1, &gpio_cb); //code crashes here. TODO: fix this
 	ret = gpio_pin_interrupt_configure(gpio1, PIN_1_02, GPIO_INT_EDGE_RISING | GPIO_INT_EDGE_TO_ACTIVE);
 	printk("return value of interrupt configure: %x\n", ret);
 	
@@ -192,13 +190,6 @@ void init_IMU_cs() {
 }
 
 float poll_IMU() {
-    if (interrupt_called) {
-			// print_unfiltered_readings();
-			// printk("max xl_x: %d\n", max_x);
-			// printk("interrupt fired\n");
-			interrupt_called = 0;
-	}
-
 	//Accelerometer
 	int8_t rx_buf_xl_x_lower[1];
 	int8_t rx_buf_xl_x_upper[1];
@@ -214,10 +205,6 @@ float poll_IMU() {
 	int8_t rx_buf_xl_z_upper[1];
 	spi_read_reg(ACCEL_Z_LOWER, rx_buf_xl_z_lower, 1);
 	spi_read_reg(ACCEL_Z_UPPER, rx_buf_xl_z_upper, 1);
-	
-	IMU_readings[XL_X_IND] = ((rx_buf_xl_x_upper[0] << 8 | rx_buf_xl_x_lower[0]) * 0.061) / 1000;
-	IMU_readings[XL_Y_IND] = ((rx_buf_xl_y_upper[0] << 8 | rx_buf_xl_y_lower[0]) * 0.061) / 1000;
-	IMU_readings[XL_Z_IND] = ((rx_buf_xl_z_upper[0] << 8 | rx_buf_xl_z_lower[0]) * 0.061) / 1000;
 
 	//Gyroscope
 	int8_t rx_buf_g_x_lower[1];
@@ -234,13 +221,17 @@ float poll_IMU() {
 	int8_t rx_buf_g_z_upper[1];
 	spi_read_reg(G_Z_LOWER, rx_buf_g_z_lower, 1);
 	spi_read_reg(G_Z_UPPER, rx_buf_g_z_upper, 1);
+	
+	k_mutex_lock(&imu_lock, K_FOREVER);
+	IMU_readings[XL_X_IND] = ((rx_buf_xl_x_upper[0] << 8 | rx_buf_xl_x_lower[0]) * 0.061) / 1000;
+	IMU_readings[XL_Y_IND] = ((rx_buf_xl_y_upper[0] << 8 | rx_buf_xl_y_lower[0]) * 0.061) / 1000;
+	IMU_readings[XL_Z_IND] = ((rx_buf_xl_z_upper[0] << 8 | rx_buf_xl_z_lower[0]) * 0.061) / 1000;
 
 	//method on how to convert raw gyroscope values to dps: https://forum.arduino.cc/t/gyro-raw-to-deg-s-conversion-code-snippet-needed/179022/3
 	IMU_readings[G_X_IND] = ((rx_buf_g_x_upper[0] << 8 | rx_buf_g_x_lower[0]) - 2.226) * (8.75 / 1000);
 	IMU_readings[G_Y_IND] = ((rx_buf_g_y_upper[0] << 8 | rx_buf_g_y_lower[0]) - 40.722) * (8.75 / 1000);
 	IMU_readings[G_Z_IND] = ((rx_buf_g_z_upper[0] << 8 | rx_buf_g_z_lower[0]) - (-209.072)) * (8.75 / 1000);
-
-	// float mag = ema_filter(calc_magnitude(IMU_readings[0], IMU_readings[1], IMU_readings[2]), prev_magnitude);
+	k_mutex_unlock(&imu_lock);
 
 	//Filter raw IMU readings using SW RC Filter
 	float filtered_readings[NUM_AXES];
@@ -250,11 +241,6 @@ float poll_IMU() {
 	}
 
 	char xl_x_filtered_buf[10], xl_y_filtered_buf[10], xl_z_filtered_buf[10];
-	// snprintf(xl_x_filtered_buf, sizeof(xl_x_filtered_buf), "%f", filtered_readings[XL_X_IND]);
-	// snprintf(xl_y_filtered_buf, sizeof(xl_y_filtered_buf), "%f", filtered_readings[XL_Y_IND]);
-	// snprintf(xl_z_filtered_buf, sizeof(xl_z_filtered_buf), "%f", filtered_readings[XL_Z_IND]);
-	// LOG_INF("xl_x: %s     xl_y: %s     xl_z: %s", xl_x_filtered_buf, xl_y_filtered_buf, xl_z_filtered_buf);
-
 	float mag = calc_magnitude(filtered_readings[XL_X_IND], filtered_readings[XL_Y_IND], filtered_readings[XL_Z_IND]);
 	return mag;
 }
@@ -308,10 +294,10 @@ void imu_thread_entry(void *p1, void *p2, void *p3) {
 	while (1) {
 		magnitude = poll_IMU();
 		snprintf(mag_buf, sizeof(mag_buf), "%f", magnitude);
-		LOG_INF("magnitude: %s", mag_buf);
-		// *steps = *steps + 1;
 		if (detect_step(magnitude, &samps, &intervals, &last_step_time_ms)) {
+			k_mutex_lock(&steps_lock, K_FOREVER);
 			*steps = *steps + 1;
+			k_mutex_unlock(&steps_lock);
 		}
 		k_msleep(SAMPLING_INTERVAL_MS);
 	}
@@ -352,7 +338,6 @@ float butterworth_filter(ButterworthFilter* filter, float input) {
 
 // Function to detect steps
 bool detect_step(float magnitude, ring_buf* samps, ring_buf* intervals, long* last_step_time_ms) {
-	// LOG_INF("Magnitude: %d.%d", (int)magnitude, (int)((magnitude - (int)magnitude)*1000));
 	float step_threshold = 1.1;
 	//insert reading into samps and calc avg
 	insert_val(magnitude, samps);

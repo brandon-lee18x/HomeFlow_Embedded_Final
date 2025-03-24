@@ -15,6 +15,7 @@
         "ring_buf.h": "c",
         "device.h": "c",
         "devicetree.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "ring_buffer.h": "c"
     }
 }
